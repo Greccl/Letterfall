@@ -40,9 +40,9 @@ func defaults() {
 	normalHead = Color{136, 204,   0}
 	normalNeck = Color{ 51, 153,  51}
 	normalTail = Color{  0,  25,   0}
-	normalMinSpeed = 2
-	normalMaxSpeed = 4
-	normalSpeedStep = 3
+	normalMinSpeed = 1
+	normalMaxSpeed = 2
+	normalSpeedStep = 5
 	normalMinLen = 8
 	normalMaxLen = 16
 	normalCharset = 2
@@ -51,17 +51,17 @@ func defaults() {
 	mutantNeck = Color{250, 255, 250}
 	mutantTail = Color{  0, 204, 122}
 	mutantMinSpeed = 1
-	mutantMaxSpeed = 2
+	mutantMaxSpeed = 1
 	mutantSpeedStep = 1
 	mutantMinLen = 12
 	mutantMaxLen = 24
 	mutantCharset = 0
 
-	frameDuration = 40
+	frameDuration = 35
 	overlap = 5
 	maxDropsPerColumn = 50
 	reservedHeight = 3
-	syncSpeed = 0
+	syncSpeed = -1
 	rainStatus = true
 }
 
@@ -69,10 +69,11 @@ func readCommandLine() {
 	files      := pflag.StringSliceP("file"    , "f", []string{}, "[path] file for reading commands")
 	configPath := pflag.StringP     ("config"  , "c", ""        , "[path] configuration file")
 	socket     := pflag.StringP     ("socket"  , "s", "0"       , "create a server socket to read commands")
-	pflag.BoolVarP(&kbDriven, "keyboard", "k", false, "enable keyboard events (disables stdin as command source)")
 	sockpath   := pflag.Bool("socket-path", false, "print socket path and exit")
 
-	pflag.Parse()	
+	pflag.Parse()
+
+	hnd := NewCommandHandler(HANDLER_TYPE_INIT)
 
 	// Read config file at the very begining
 	if *configPath != "" {
@@ -82,7 +83,7 @@ func readCommandLine() {
 			sc := bufio.NewScanner(f)
 			for sc.Scan() {
 				line := sc.Text()
-				parseCommand(line)
+				hnd.eval(line)
 			}
 		}
 	}
@@ -105,7 +106,24 @@ func readCommandLine() {
 
 	// proccess non-flag arguments as comands
 	for _, cmd := range pflag.Args() {
-		parseCommand(cmd)
+		hnd.eval(cmd)
+	}
+
+	// Check if our program was redirected from a pipe
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		panic(err)
+	}
+	if (info.Mode() & os.ModeCharDevice) == 0 {
+		// its a pipe, read stdin as a command source
+		go func() {
+			hnd := NewCommandHandler(HANDLER_TYPE_FILE)
+			sc := bufio.NewScanner(os.Stdin)
+			for sc.Scan() {
+				line := sc.Text()
+				hnd.eval(line)
+			}
+		}()
 	}
 }
 
@@ -126,10 +144,12 @@ func handleConn(conn net.Conn) {
 	defer conn.Close()
 
 	reader := bufio.NewScanner(conn)
+	hnd := NewCommandHandler(HANDLER_TYPE_CONN)
+	hnd.writer = bufio.NewWriter(conn)
 
 	for reader.Scan() {
 		line := reader.Text()
-		parseCommand(line)
+		hnd.eval(line)
 	}
 }
 
@@ -137,10 +157,11 @@ func readCommandFile(path string) {
 	f, err := os.Open(path)
 	if err != nil { return }
 	defer f.Close()
+	hnd := NewCommandHandler(HANDLER_TYPE_FILE)
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		line := sc.Text()
-		parseCommand(line)
+		hnd.eval(line)
 	}
 }
 

@@ -88,7 +88,7 @@ func (t *Text) setText(str string) {
 	oldLen := len(t.runes) - 1
 	t.runes = []rune(str)
 	for oldLen >= len(t.runes) {
-		releaseCell(2, t.x+oldLen, t.y)
+		releaseCell(LAYER_TEXT, t.x+oldLen, t.y)
 		oldLen--
 	}
 	t.anim.init(t)
@@ -112,7 +112,7 @@ func (t *Text) setAnimation(name string) {
 
 func (t *Text) releaseAll() {
 	for x:=0; x<len(t.runes); x++ {
-		releaseCell(2, t.x+x, t.y)
+		releaseCell(LAYER_TEXT, t.x+x, t.y)
 	}
 }
 
@@ -152,7 +152,7 @@ func (self *TextAnimator0) draw(t *Text) {
 	s.SetBackgroundRGB(t.bg.r, t.bg.g, t.bg.b)
 	s.SetForegroundRGB(t.fg.r, t.fg.g, t.fg.b)
 	for i, r := range t.runes {
-		drawCell(2, t.x+i, t.y, r, s)
+		drawCell(LAYER_TEXT, t.x+i, t.y, r, s)
 	}
 }
 
@@ -207,7 +207,7 @@ func (self *TextAnimator1) draw(t *Text) {
 	s := tcell.StyleDefault
 	s.SetForegroundRGB(self.fg.r, self.fg.g, self.fg.b)
 	s.SetBackgroundRGB(t.bg.r, t.bg.g, t.bg.b)
-	drawCell(2, t.x+self.i, t.y, t.runes[self.i], s)
+	drawCell(LAYER_TEXT, t.x+self.i, t.y, t.runes[self.i], s)
 	self.i = -1
 }
 
@@ -264,7 +264,7 @@ func (self *TextAnimator2) draw(t *Text) {
 	s := tcell.StyleDefault
 	s.SetForegroundRGB(self.fg.r, self.fg.g, self.fg.b)
 	s.SetBackgroundRGB(t.bg.r, t.bg.g, t.bg.b)
-	drawCell(2, t.x+self.i, t.y, t.runes[self.i], s)
+	drawCell(LAYER_TEXT, t.x+self.i, t.y, t.runes[self.i], s)
 	self.i = -1
 }
 
@@ -290,7 +290,7 @@ func (self *TextAnimator3) tick(t *Text) {
 		s := tcell.StyleDefault
 		s.SetBackgroundRGB(t.bg.r, t.bg.g, t.bg.b)
 		s.SetForegroundRGB(t.fg.r, t.fg.g, t.fg.b)
-		drawCell(2, t.x+self.last, t.y, t.runes[self.last], s)		
+		drawCell(LAYER_TEXT, t.x+self.last, t.y, t.runes[self.last], s)		
 	}
 }
 
@@ -299,7 +299,7 @@ func (self *TextAnimator3) draw(t *Text) {
 	s.SetBackgroundRGB(t.bg.r, t.bg.g, t.bg.b)
 	s.SetForegroundRGB(t.fg.r, t.fg.g, t.fg.b)
 	for i:=0; i<self.last; i++ {
-		drawCell(2, t.x+i, t.y, t.runes[i], s)
+		drawCell(LAYER_TEXT, t.x+i, t.y, t.runes[i], s)
 	}
 }
 
@@ -311,7 +311,7 @@ func (self *TextAnimator3) draw(t *Text) {
 //
 // ***text*** command handler
 //
-func handleCommand_text(fs *pflag.FlagSet) {
+func handleCommand_text(fs *pflag.FlagSet) string {
 	var t *Text
 	var draw, movex, movey bool
 
@@ -330,7 +330,7 @@ func handleCommand_text(fs *pflag.FlagSet) {
 		if t != nil {
 			t.autoremove()
 		}
-		return
+		return ""
 	}
 
 	// Create if doesnt exists
@@ -421,6 +421,7 @@ func handleCommand_text(fs *pflag.FlagSet) {
 
 	// Reset flagset state to process next command
 	// fs.VisitAll(resetFlag)
+	return ""
 }
 
 

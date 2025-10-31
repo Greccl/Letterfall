@@ -30,8 +30,7 @@ func SliceRemove[T any](s []T, i int) []T {
 
 
 
-var ch_Commands = make(chan SplitCmd, 32)
-var kbDriven bool
+var ch_HandleRequests = make(chan HandleRequest, 32)
 
 
 
@@ -40,7 +39,6 @@ var kbDriven bool
 func main() {
 	// Read command line arguments
 	defaults()
-	initCommands()
 	readCommandLine()
 
 	// Init tcell screen
@@ -57,6 +55,7 @@ func main() {
 	defer scr.Fini()
 
 	ch_ScreenEvents := make(chan tcell.Event)
+
 	go func() {
 		for {
 			ev := scr.PollEvent()
@@ -107,34 +106,31 @@ func main() {
 				switch ev := ev.(type) {
 					case *tcell.EventKey:
 						if ev.Key() == tcell.KeyEscape { break LOOP }
+						if ev.Key() == tcell.KeyCtrlQ { break LOOP }
 						if ev.Key() == tcell.KeyRune {
 							switch ev.Rune() {
 								case 'p':
 									rainStatus = !rainStatus
 								case 's':
 									if !rainStatus {
-										rain_tick()
 										text_tick()
+										rain_tick()
+										back_tick()
 									}
-								case 'q':
-									break LOOP
 							}
 						}
 					case *tcell.EventResize:
 						resize()
 				}
-			case split := <- ch_Commands:
-				cmd  := split.cmd
-				args := split.args
-				cmd.fs.Parse(args)
-				cmd.fn(cmd.fs)
-				cmd.fs.VisitAll(resetFlag)
+			case req := <- ch_HandleRequests:
+				req.hnd.do(req.cmd)
 			case <- ch_Draw:
 				scr.Show()
 			case <- ch_Tick:
 				if rainStatus {
-					rain_tick()
 					text_tick()
+					rain_tick()
+					back_tick()
 				}
 		}
 	}

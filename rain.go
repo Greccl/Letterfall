@@ -10,25 +10,27 @@ import (
 
 
 var cols []Column
+var backs []Column
 var syncCount int
 var syncAdvance bool
 var rainStatus bool
 
-/*
-type Cell struct {
-	r rune
-	value int
-}
-var scene [][]Cell
-*/
+
 
 func rain_resize() {
 	if scrw == 0 { return }
 	cols = SliceResize(cols, scrw)
+	backs = SliceResize(backs, scrw)
 	
 	for i := range cols {
 		cols[i].x = i
+		cols[i].layer = LAYER_RAIN
 		cols[i].resize()
+	}
+	for i := range backs {
+		backs[i].x = i
+		backs[i].layer = LAYER_BACK
+		backs[i].resize()
 	}
 }
 
@@ -42,12 +44,16 @@ func rain_tick() {
 		} else {
 			syncAdvance = false
 		}
+	} else if syncSpeed < 0 {
+		syncCount++
 	}
 	for i := 0; i < len(cols); i++ {
 		cols[i].tick()
 	}
 	damage()
 }
+
+
 
 
 /*
@@ -114,7 +120,7 @@ func generator_1() {
 */
 
 var genCounter int
-var density float32 = 5.0
+var density float32 = 0.6
 var spawnLeft float32
 
 func generator_0() {
@@ -125,7 +131,6 @@ func generator_0() {
 	chunks := float32(scrw) / 10.0 / 3.0
 	newCount := chunks + spawnLeft
 	newCount *= density
-	// newCount *= rand.Float32()
 
 	var mutantSpawned bool
 	for ; newCount >= 1.0; newCount -= 1.0 {
@@ -173,6 +178,9 @@ func generator_0() {
 				d.pos = zero.pos - zero.length
 			}
 			if d.pos > 0 { d.pos = 0 }
+			if syncSpeed < 0 {
+				d.count = syncCount % d.speed
+			}
 		}
 	}
 
@@ -191,4 +199,76 @@ func generator_0() {
 		}
 	}
 	*/
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var backSpeed int = 25
+var backCount int
+
+func back_tick() {
+	back_generator_0()
+	backCount++
+	if backCount < backSpeed { return }
+	backCount = 0
+	for i := 0; i < len(backs); i++ {
+		backs[i].tick()
+	}
+}
+
+
+
+
+var backSpawnDelay int = 1050
+var backSpawnCounter int
+
+func back_generator_0() {
+	backSpawnCounter += frameDuration
+	if backSpawnCounter < backSpawnDelay { return }
+	backSpawnCounter = 0
+
+	x := rand.IntN(scrw)
+	initialx := x
+	MAX: for max:=0; max<5; max++ {
+		x = initialx
+		for {
+			if backs[x].count == max { break MAX }
+			x++
+			if x >= scrw { x = 0 }
+			if x == initialx { break }
+		}
+	}
+
+	if backs[x].count >= maxDropsPerColumn {
+		return
+	}
+
+	var zero *Drop
+	if backs[x].count > 0 {
+		zero = &backs[x].drops[backs[x].count-1]
+		if zero.pos < overlap { return }
+	}
+	
+	d := backs[x].newDrop()
+	d.reset()
+	d.makeBackdrop()
+	if zero != nil {
+		d.pos = zero.pos - zero.length - 3
+	}
+	if d.pos > 0 { d.pos = 0 }
 }

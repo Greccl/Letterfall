@@ -1,0 +1,3 @@
+function M_screen
+	micro screen.go main.go
+end

@@ -2,7 +2,6 @@ package main
 
 import (
 	"math/rand/v2"
-	//"github.com/Greccl/tcell/v2"
 )
 
 
@@ -42,14 +41,24 @@ func (self *Drop) makeMutant() {
 	self.resetRunes(mutantCharset)
 }
 
-
-
-
+func (self *Drop) makeBackdrop() {
+	self.back = true
+	self.mutant = false
+	self.speed = 1
+	self.length = 5
+	self.resetRunes(-1)
+}
 
 func (self *Drop) makeLucent() {
 	self.makeNormal()
 	self.lucent = true
 }
+
+
+
+
+
+
 
 func (self *Drop) reset() {
 	self.pos = 0
@@ -60,6 +69,8 @@ func (self *Drop) reset() {
 func (self *Drop) resetRunes(n int) {
 	for r := range self.runes {
 		switch n {
+			case -1:
+				self.runes[r] = '.'
 			case 0:
 				self.runes[r] = rand.Int32N(27) + 65
 			case 1:

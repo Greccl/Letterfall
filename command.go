@@ -3,24 +3,124 @@ package main
 import (
 	"github.com/google/shlex"
 	"github.com/spf13/pflag"
+	"sync"
+	"bufio"
 )
 
 
 
 
 
+
+
+
 type Command struct {
-	fs *pflag.FlagSet
-	fn func(*pflag.FlagSet)
+	flagset *pflag.FlagSet
+	doInMain bool
+	handle func(*pflag.FlagSet)string
+	mu sync.Mutex
 }
 
-type SplitCmd struct {
+type HandleRequest struct {
+	hnd *CommandHandler
 	cmd *Command
-	args []string
 }
 
-var commands = make( map[string]*Command )
 
+
+
+
+const (
+	HANDLER_TYPE_MAIN int = iota
+	HANDLER_TYPE_INIT
+	HANDLER_TYPE_CONN
+	HANDLER_TYPE_FILE
+)
+
+func NewCommandMap(kind int) map[string]*Command {
+	commands := make(map[string]*Command)
+
+	var cmd *Command
+	var fset *pflag.FlagSet
+
+	fset = pflag.NewFlagSet("text", pflag.ContinueOnError)
+	fset.IntSliceP("position"  , "p", []int{}, "a compact way to set x and y position")
+	fset.IntP     ("x"         , "x", 0      , "x position of text box")
+	fset.IntP     ("y"         , "y", 0      , "y position of text box")
+	fset.BoolP    ("halign"    , "h", false  , "evaluate horizontal position from center of screen")
+	fset.BoolP    ("valign"    , "v", false  , "evaluate vertical position from center of screen")
+	fset.IntP     ("id"        , "i", 0      , "identifier (integer value) for the text box")
+	fset.StringP  ("name"      , "n", ""     , "identifier (string) for the text box")
+	fset.BoolP    ("kill"      , "k", false  , "try remove given box")
+	fset.StringP  ("animation" , "a", ""     , "name of animation")
+	fset.StringP  ("foreground", "f", ""     , "set foreground colour")
+	fset.StringP  ("background", "b", ""     , "set background colour")
+	cmd = new(Command)
+	cmd.flagset = fset
+	cmd.doInMain = true
+	cmd.handle = handleCommand_text
+	commands["text"] = cmd
+	// cmd := new(Command)
+	// commands["text"] = cmd
+	// cmd.fs = fset
+	// cmd.fn = handleCommand_text
+
+	// fset = pflag.NewFlagSet("state", pflag.ContinueOnError)
+	// commands["state"] = fset
+	// handlers["state"] = handleCommand_state
+
+/*
+	fset = pflag.NewFlagSet("delay", pflag.ContinueOnError)
+	commands["automate"] = fset
+	handlers["state"] = handleCommand_state
+*/
+	return commands
+}
+
+
+
+
+
+
+
+
+type CommandHandler struct {
+	commands map[string]*Command
+	writer *bufio.Writer
+}
+
+func NewCommandHandler(kind int) *CommandHandler {
+	self := new(CommandHandler)
+	self.commands = NewCommandMap(kind)
+	return self
+}
+
+func (self *CommandHandler) eval(line string) {
+	args, err := shlex.Split(line)
+	if err != nil || len(args) < 1 { return }
+	cmd, exists := self.commands[args[0]]
+	if !exists { return }
+	cmd.mu.Lock()
+	if len(args) > 1 {
+		cmd.flagset.Parse(args[1:])
+	}
+	if cmd.doInMain {
+		ch_HandleRequests <- HandleRequest{self, cmd}
+		return
+	}
+	self.do(cmd)
+}
+
+func (self *CommandHandler) do(cmd *Command) {
+	result := cmd.handle(cmd.flagset)
+	cmd.flagset.VisitAll(resetFlag)
+	cmd.mu.Unlock()
+	if self.writer != nil {
+		self.writer.WriteString(result)
+		self.writer.WriteString("\n")
+		self.writer.Flush()
+	}
+}
 
 
 
@@ -68,15 +168,6 @@ func getString(fs *pflag.FlagSet, name string) (bool,string) {
 
 
 
-
-
-
-
-
-
-
-
-
 func handleCommand_state(fs *pflag.FlagSet) string {
 	args := fs.Args()
 	if len(args) == 0 {
@@ -89,55 +180,3 @@ func handleCommand_state(fs *pflag.FlagSet) string {
 	}
 	return ""
 }
-
-
-
-
-
-func initCommands() {
-	fset := pflag.NewFlagSet("text", pflag.ContinueOnError)
-	fset.IntSliceP("position" , "p", []int{}, "a compact way to set x and y position")
-	fset.IntP    ("x"         , "x", 0      , "x position of text box")
-	fset.IntP    ("y"         , "y", 0      , "y position of text box")
-	fset.BoolP   ("halign"    , "h", false  , "evaluate horizontal position from center of screen")
-	fset.BoolP   ("valign"    , "v", false  , "evaluate vertical position from center of screen")
-	fset.IntP    ("id"        , "i", 0      , "identifier (integer value) for the text box")
-	fset.StringP ("name"      , "n", ""     , "identifier (string) for the text box")
-	fset.BoolP   ("kill"      , "k", false  , "try remove given box")
-	fset.StringP ("animation" , "a", ""     , "name of animation")
-	fset.StringP ("foreground", "f", ""     , "set foreground colour")
-	fset.StringP ("background", "b", ""     , "set background colour")
-	commands["text"] = &Command{fset,handleCommand_text}
-	// cmd := new(Command)
-	// commands["text"] = cmd
-	// cmd.fs = fset
-	// cmd.fn = handleCommand_text
-
-	// fset = pflag.NewFlagSet("state", pflag.ContinueOnError)
-	// commands["state"] = fset
-	// handlers["state"] = handleCommand_state
-
-/*
-	fset = pflag.NewFlagSet("delay", pflag.ContinueOnError)
-	commands["automate"] = fset
-	handlers["state"] = handleCommand_state
-*/
-}
-
-
-
-
-
-
-func parseCommand(line string) {
-	args, err := shlex.Split(line)
-	if err != nil || len(args) == 0 { return }
-	cmd, exists := commands[args[0]]
-	if !exists { return }
-	if len(args) > 0 {
-		ch_Commands <- SplitCmd{cmd,args[1:]}
-	} else {
-		ch_Commands <- SplitCmd{cmd,args[1:]}
-	}
-}
-

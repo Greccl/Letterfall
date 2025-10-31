@@ -73,6 +73,13 @@ func parseColor(s string) (c Color, err error) {
 
 
 
+const (
+	LAYER_BASE int8 = iota
+	LAYER_BACK
+	LAYER_RAIN
+	LAYER_TEXT
+	LAYER_COUNT
+)
 
 type Cell struct {
 	r rune
@@ -80,7 +87,7 @@ type Cell struct {
 }
 
 type CellState struct {
-	data [3]Cell
+	data [LAYER_COUNT]Cell
 	owner int8
 }
 
@@ -124,14 +131,14 @@ func printText(x, y int, s string) {
 	damage()
 }
 
-func drawCell(level int8, x, y int, r rune, s tcell.Style) {
+func drawCell(layer int8, x, y int, r rune, s tcell.Style) {
 	if x >= scrw { return }
 	if y >= scrh { return }
 	cell := &state[x][y]
-	cell.data[level].r = r
-	cell.data[level].s = s
-	if level > cell.owner { cell.owner = level }
-	if level == cell.owner {
+	cell.data[layer].r = r
+	cell.data[layer].s = s
+	if layer > cell.owner { cell.owner = layer }
+	if layer == cell.owner {
 		scr.SetContent(x, y, r, nil, s)
 		damage()
 	}

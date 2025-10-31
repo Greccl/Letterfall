@@ -2,19 +2,18 @@ package main
 
 import (
 	// "fmt"
-	"math/rand/v2"
+	// "math/rand/v2"
 	"github.com/Greccl/tcell/v2"
 )
 
 
 
 type Column struct {
-	// state []CellState
-
 	drops []Drop
 	count int
 	visibleCount int
 	x int
+	layer int8
 
 	backs Drop
 }
@@ -29,7 +28,6 @@ func (self *Column) resize() {
 		self.drops[i].runes = SliceResize(self.drops[i].runes, scrh)
 	}
 	self.backs.runes = SliceResize(self.backs.runes, scrh)
-	// self.state = Reslice(self.state, scrh)
 }
 
 
@@ -68,11 +66,18 @@ func (self *Column) tick() {
 		d = &self.drops[i]
 
 		trueAdvance := false
-		if d.mutant || syncSpeed == 0 {
+		if d.mutant || syncSpeed <= 0 {
 			d.count++
 			if d.count >= d.speed { trueAdvance = true }
-		} else {
-			if syncAdvance { trueAdvance = true }
+		} else
+		/*
+		if syncSpeed == -1 && syncCount % d.speed == 0 {
+			d.count++
+			if d.count >= d.speed { trueAdvance = true }
+		} else
+		*/
+		if syncAdvance {
+			trueAdvance = true
 		}
 
 		if trueAdvance {
@@ -108,7 +113,7 @@ func (self *Column) tick() {
 	// Remove completed
 	if self.drops[0].end >= scrh {
 		self.remove(0)
-		scr.SetContent(self.x, scrh-1, ' ', nil, tcell.StyleDefault)
+		releaseCell(self.layer, self.x, scrh-1)
 	}
 
 	// Drawing
@@ -134,49 +139,41 @@ func (self *Column) draw(i int) {
 	s := tcell.StyleDefault
 	var y int
 
+	head := normalHead
+	neck := normalNeck
+	tail := normalTail
+	if d.mutant {
+		head = mutantHead
+		neck = mutantNeck
+		tail = mutantTail		
+	} else
+	if d.back {
+		head = Color{90, 90, 100}
+		neck = Color{90, 90, 90}
+		tail = Color{10, 10, 20}
+	} else
+	if d.lucent {
+		
+	}
+	
 	l := d.pos - d.end + 1
 	for p := 0; p <= l; p++ {
 		y = d.pos-p
 		if y < 0 { return }
 		if y >= scrh { continue }
-		// can := canDraw(1, self.x, y)
 		if p == 0 {
-			if d.mutant {
-				s.SetForegroundRGB(mutantHead.r, mutantHead.g, mutantHead.b)
-			} else {
-				if d.lucent {			
-					s.SetForegroundRGB(lucentHead.r, lucentHead.g, lucentHead.b)
-				} else {
-					s.SetForegroundRGB(normalHead.r, normalHead.g, normalHead.b)
-				}
-			}
+			s.SetForegroundRGB(head.r, head.g, head.b)
 		} else if p == l {
-			// if can {
-				// drawCell(1, self.x, y, ' ', tcell.StyleDefault)
-			// }
-			releaseCell(1, self.x, y)
+			releaseCell(self.layer, self.x, y)
 			continue
 		} else {
 			alfa := int32((d.length - p)*1000/d.length)
 			var c Color
-			if d.mutant {
-				c = blend(mutantNeck, mutantTail, 1000-alfa)
-			} else {
-				if d.lucent {
-					
-				} else {
-					c = blend(normalNeck, normalTail, 1000-alfa)
-				}
-			}
+			c = blend(neck, tail, 1000-alfa)
 			s.SetForegroundRGB(c.r, c.g, c.b)
 		}
-		// if can {
-			// scr.SetContent(self.x, y, d.runes[y], nil, s)
-			drawCell(1, self.x, y, d.runes[y], s)
-		// }
+		drawCell(self.layer, self.x, y, d.runes[y], s)
 	}
-	// if self.x > 0 { cols[self.x-1].backDraw() }
-	// if self.x < scrw - 1 { cols[self.x+1].backDraw() }
 	
 	d.dirty = false
 }
@@ -193,83 +190,3 @@ func (self *Column) draw(i int) {
 
 
 var backrunes = []rune{9679, 9670, 9643, 9642, 9702, 9711}
-
-func (self *Column) addBackDrop() {
-	d := &self.backs
-	d.pos = 0
-	d.length = rand.IntN(4) + 4
-	d.speed = rand.IntN(3) + 15
-	d.back = true
-	d.count = 0
-	
-	for r := range d.runes {
-		//d.runes[r] = backrunes[rand.IntN(len(backrunes))]
-		d.runes[r] = rand.Int32N(4) + 8756
-	}
-}
-
-func (self *Column) backTick() {
-	d := &self.backs
-	
-	if d.speed == 0 { return }
-	
-	d.count++
-	if d.count >= d.speed {
-		d.pos++
-		d.count = 0
-	} else {
-		return
-	}
-	
-	// Ending
-	d.end = d.pos - d.length + 1
-	if d.end < 0 { d.end = 0 }
-	if d.end >= scrh {
-		d.speed = 0
-	}
-
-	self.backDraw()
-}
-
-func (self *Column) backDraw() {
-	d := &self.backs
-	if d.length == 0 { return }
-
-	s := tcell.StyleDefault
-	var r, g, b int32
-	r = backTail.r / 128 //int32(d.length)
-	g = backTail.g / 128 //int32(d.length)
-	b = backTail.b / 128 //int32(d.length)
-
-	var y int
-
-	// var prev, next *Column
-	// if self.x > 0 { prev = &cols[self.x-1] }
-	// if self.x < scrw - 1 { next = &cols[self.x+1] }
-	
-	l := d.pos - d.end + 1
-	for p := 0; p <= l; p++ {
-		y = d.pos - p
-		if y < 0 { return }
-		if y >= scrh { continue }
-		if p == l {
-			scr.SetContent(self.x, y, ' ', nil, tcell.StyleDefault)
-			continue
-		} else {
-			var bright int32 = 510
-			// if prev != nil { bright -= prev.state[y].b }
-			// if next != nil { bright -= next.state[y].b }
-			bright /= 2
-			//bright /= 255
-			// self.state[y].b = bright
-			rr := r * bright
-			gg := g * bright
-			bb := b * bright
-			rr = 41
-			gg = 41
-			bb = 61
-			s.SetForegroundRGB(rr, gg, bb)
-		}
-		scr.SetContent(self.x, y, d.runes[y], nil, s)
-	}
-}
