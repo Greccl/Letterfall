@@ -55,6 +55,8 @@ type Text struct {
 
 func NewText() *Text {
 	self := new(Text)
+	// self.x = -1
+	self.y = -1
 	self.setAnimation("none")
 	self.fg = Color{255, 255, 255}
 	self.bg = Color{  0,   0,   0}
@@ -339,6 +341,7 @@ func handleCommand_text(fs *pflag.FlagSet) string {
 		t.id = id
 		t.name = name
 		boxes = append(boxes, t)
+		movey = true
 	}
 
 	// Text
@@ -411,7 +414,6 @@ func handleCommand_text(fs *pflag.FlagSet) string {
 	if movey {
 		t.movey()
 		draw = true
-		// panic("MOVE Y")
 	}
 
 	// redraw needed
@@ -419,8 +421,6 @@ func handleCommand_text(fs *pflag.FlagSet) string {
 		t.anim.draw(t)
 	}
 
-	// Reset flagset state to process next command
-	// fs.VisitAll(resetFlag)
 	return ""
 }
 
@@ -432,7 +432,7 @@ func handleCommand_text(fs *pflag.FlagSet) string {
 // Text animation loop
 //
 
-func text_tick() {
+func tick_text() {
 	for i := range boxes {
 		t := boxes[i]
 		t.anim.tick(t)

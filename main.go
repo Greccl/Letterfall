@@ -29,16 +29,133 @@ func SliceRemove[T any](s []T, i int) []T {
 
 
 
+const (
+	EVENT_EXIT int = iota
+	EVENT_PLAY
+	EVENT_STEP
+)
+
+type InternalEvent struct {
+	tcell.EventTime
+	event int
+}
+
+func postEvent(e int) {
+	var ie InternalEvent
+	ie.event = e
+	scr.PostEvent(&ie)
+}
+
+func tick() {
+	tick_text()
+	tick_stream()
+	tick_rain()
+	tick_back()
+}
+
+var onRune func(rune)
+var onKey func(tcell.Key)
+
+func setKeyboardHandlers_default() {
+	onRune = defaultRuneHandler
+	onKey = defaultKeyHandler
+}
+
+func defaultRuneHandler(r rune) {
+	
+}
+
+func defaultKeyHandler(k tcell.Key) {
+	
+}
+
+func handleKey(ev *tcell.EventKey) {
+	switch ev.Key() {
+		case tcell.KeyRune:
+			if onRune != nil {
+				onRune(ev.Rune())
+			}
+		case tcell.KeyCtrlS:
+			minishell_toggle()
+		case tcell.KeyEscape, tcell.KeyCtrlQ, tcell.KeyCtrlC:
+			postEvent(EVENT_EXIT)
+		default:
+			if onKey != nil {
+				onKey(ev.Key())
+			}
+	}
+}
+
+
+
+
+type TickTask struct {
+	interval int
+	elapsed int
+	runing bool
+	callback func()
+}
+
+var tickRegistry = make([]TickTask, 0)
+
+func addTickCallback(interval int, callback func()) int {
+	var task TickTask
+	task.interval = interval
+	task.callback = callback
+	task.runing = true
+	tickRegistry = append(tickRegistry, task)
+	return len(tickRegistry) - 1
+}
+
+func setTickStatus(i int, status bool) {
+	if i >= len(tickRegistry) { return }
+	tickRegistry[i].runing = status
+}
+
+func resetTick(i int) {
+	if i >= len(tickRegistry) { return }
+	tickRegistry[i].elapsed = 0
+}
+
+func tickCycle() {
+	for i := range tickRegistry {
+		t := &tickRegistry[i]
+		if !t.runing { continue }
+		t.elapsed += frameDuration
+		if t.elapsed >= t.interval {
+			t.callback()
+			t.elapsed -= t.interval
+		}
+	}
+}
+
+
+type ResizeListener func()
+
+var resizeListeners []ResizeListener 
+
+func addResizeListener(f ResizeListener) int {
+	resizeListeners = append(resizeListeners, f)
+	return len(resizeListeners)
+}
+
+func callResizeListeners() {
+	for _, f := range resizeListeners {
+		f()
+	}
+}
+
+type HandleRequest struct {
+	hnd *CommandHandler
+	cmd *Command
+}
 
 var ch_HandleRequests = make(chan HandleRequest, 32)
 
 
 
-
-
 func main() {
-	// Read command line arguments
-	defaults()
+	loadDefaults()
 	readCommandLine()
 
 	// Init tcell screen
@@ -63,6 +180,10 @@ func main() {
 		}
 	}()
 
+	// Other inits
+	init_minishell()
+	minishell_toggle()
+
 	// A timer to update animations
 	ch_Tick := time.Tick(time.Duration(frameDuration)*time.Millisecond)
 
@@ -82,6 +203,7 @@ func main() {
 						}
 					case *tcell.EventResize:
 						resize()
+						callResizeListeners()
 						initTimeout = 0
 						break INIT
 				}
@@ -94,8 +216,7 @@ func main() {
 	}
 	
 	if initTimeout != 0 {
-		// Timeout reached or aborted by Esc key
-		return
+		return // Timeout reached or aborted by Esc key
 	}
 
 	// Main loop
@@ -105,32 +226,30 @@ func main() {
 			case ev := <- ch_ScreenEvents:
 				switch ev := ev.(type) {
 					case *tcell.EventKey:
-						if ev.Key() == tcell.KeyEscape { break LOOP }
-						if ev.Key() == tcell.KeyCtrlQ { break LOOP }
-						if ev.Key() == tcell.KeyRune {
-							switch ev.Rune() {
-								case 'p':
-									rainStatus = !rainStatus
-								case 's':
-									if !rainStatus {
-										text_tick()
-										rain_tick()
-										back_tick()
-									}
-							}
-						}
+						handleKey(ev)
 					case *tcell.EventResize:
 						resize()
+						callResizeListeners()
+					case *InternalEvent:
+						switch ev.event {
+							case EVENT_EXIT:
+								break LOOP
+							case EVENT_PLAY:
+								rainStatus = !rainStatus
+							case EVENT_STEP:
+								if !rainStatus {
+									tick()
+								}
+						}
 				}
 			case req := <- ch_HandleRequests:
 				req.hnd.do(req.cmd)
 			case <- ch_Draw:
 				scr.Show()
 			case <- ch_Tick:
+				tickCycle()
 				if rainStatus {
-					text_tick()
-					rain_tick()
-					back_tick()
+					tick()
 				}
 		}
 	}

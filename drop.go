@@ -46,7 +46,7 @@ func (self *Drop) makeBackdrop() {
 	self.mutant = false
 	self.speed = 1
 	self.length = 5
-	self.resetRunes(-1)
+	self.resetRunes(backCharset)
 }
 
 func (self *Drop) makeLucent() {
@@ -70,7 +70,11 @@ func (self *Drop) resetRunes(n int) {
 	for r := range self.runes {
 		switch n {
 			case -1:
-				self.runes[r] = '.'
+				// self.runes[r] = '\u25AE'
+				self.runes[r] = '|'
+			case -2:
+				self.runes[r] = '°'
+				// self.runes[r] = '\u2591'
 			case 0:
 				self.runes[r] = rand.Int32N(27) + 65
 			case 1:

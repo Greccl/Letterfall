@@ -1,4 +1,4 @@
-module gmatrix
+module letterfall
 
 go 1.25.0
 

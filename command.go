@@ -5,12 +5,9 @@ import (
 	"github.com/spf13/pflag"
 	"sync"
 	"bufio"
+	"strconv"
+	"time"
 )
-
-
-
-
-
 
 
 
@@ -21,28 +18,20 @@ type Command struct {
 	mu sync.Mutex
 }
 
-type HandleRequest struct {
-	hnd *CommandHandler
-	cmd *Command
-}
-
-
-
-
-
-const (
-	HANDLER_TYPE_MAIN int = iota
-	HANDLER_TYPE_INIT
-	HANDLER_TYPE_CONN
-	HANDLER_TYPE_FILE
-)
-
 func NewCommandMap(kind int) map[string]*Command {
-	commands := make(map[string]*Command)
-
 	var cmd *Command
 	var fset *pflag.FlagSet
+	var commands = make(map[string]*Command)
 
+	// SET
+	fset = pflag.NewFlagSet("set", pflag.ContinueOnError)
+	cmd = new(Command)
+	cmd.flagset = fset
+	cmd.doInMain = true
+	cmd.handle = handleCommand_set
+	commands["set"] = cmd
+
+	// TEXT
 	fset = pflag.NewFlagSet("text", pflag.ContinueOnError)
 	fset.IntSliceP("position"  , "p", []int{}, "a compact way to set x and y position")
 	fset.IntP     ("x"         , "x", 0      , "x position of text box")
@@ -60,20 +49,47 @@ func NewCommandMap(kind int) map[string]*Command {
 	cmd.doInMain = true
 	cmd.handle = handleCommand_text
 	commands["text"] = cmd
-	// cmd := new(Command)
-	// commands["text"] = cmd
-	// cmd.fs = fset
-	// cmd.fn = handleCommand_text
 
-	// fset = pflag.NewFlagSet("state", pflag.ContinueOnError)
-	// commands["state"] = fset
-	// handlers["state"] = handleCommand_state
+	// BANNER
+	fset = pflag.NewFlagSet("banner", pflag.ContinueOnError)
+	cmd = new(Command)
+	cmd.flagset = fset
+	cmd.doInMain = true
+	cmd.handle = handleCommand_banner
+	commands["banner"] = cmd
 
-/*
-	fset = pflag.NewFlagSet("delay", pflag.ContinueOnError)
-	commands["automate"] = fset
-	handlers["state"] = handleCommand_state
-*/
+	// STREAM
+	if kind != HANDLER_TYPE_SHELL {
+		fset = pflag.NewFlagSet("stream", pflag.ContinueOnError)
+		fset.IntSliceP("position"  , "p", []int{}, "a compact way to set x and y position")
+		fset.IntP     ("x"         , "x", 0      , "x position of text box")
+		fset.IntP     ("y"         , "y", 0      , "y position of text box")
+		fset.IntP     ("width"     , "w", 10     , "box's width")
+		fset.BoolP    ("halign"    , "h", false  , "evaluate horizontal position from center of screen")
+		fset.BoolP    ("valign"    , "v", false  , "evaluate vertical position from center of screen")
+		fset.IntP     ("id"        , "i", 0      , "identifier (integer value) for the text box")
+		fset.StringP  ("name"      , "n", ""     , "identifier (string) for the text box")
+		fset.BoolP    ("kill"      , "k", false  , "try remove given box")
+		fset.StringP  ("animation" , "a", ""     , "name of animation")
+		fset.StringP  ("foreground", "f", ""     , "set foreground colour")
+		fset.StringP  ("background", "b", ""     , "set background colour")
+		cmd = new(Command)
+		cmd.flagset = fset
+		cmd.doInMain = true
+		cmd.handle = handleCommand_stream
+		commands["stream"] = cmd
+	}
+
+	// SLEEP
+	if kind != HANDLER_TYPE_INIT && kind != HANDLER_TYPE_SHELL {
+		fset = pflag.NewFlagSet("sleep", pflag.ContinueOnError)
+		cmd = new(Command)
+		cmd.flagset = fset
+		cmd.doInMain = false
+		cmd.handle = handleCommand_sleep
+		commands["sleep"] = cmd
+	}
+
 	return commands
 }
 
@@ -81,8 +97,20 @@ func NewCommandMap(kind int) map[string]*Command {
 
 
 
+// CommandHandler allows reading line of commands
+// from many diferent sources. once a line is readed,
+// eval() transform a line in a request. if command
+// is suposed to be ran in main loop it schedules a
+// request by the request channel polled in main().
+// if not, it is executed immediatelly.
 
-
+const (
+	HANDLER_TYPE_MAIN int = iota
+	HANDLER_TYPE_INIT
+	HANDLER_TYPE_CONN
+	HANDLER_TYPE_FILE
+	HANDLER_TYPE_SHELL
+)
 
 type CommandHandler struct {
 	commands map[string]*Command
@@ -115,13 +143,12 @@ func (self *CommandHandler) do(cmd *Command) {
 	result := cmd.handle(cmd.flagset)
 	cmd.flagset.VisitAll(resetFlag)
 	cmd.mu.Unlock()
-	if self.writer != nil {
+	if self.writer != nil && len(result) > 0 {
 		self.writer.WriteString(result)
 		self.writer.WriteString("\n")
 		self.writer.Flush()
 	}
 }
-
 
 
 
@@ -178,5 +205,19 @@ func handleCommand_state(fs *pflag.FlagSet) string {
 		case "pause":
 			rainStatus = !rainStatus
 	}
+	return ""
+}
+
+func handleCommand_sleep(fs *pflag.FlagSet) string {
+	args := fs.Args()
+	if len(args) == 0 {
+		return ""
+	}
+	secs, err := strconv.ParseFloat(fs.Arg(0), 64)
+	if err != nil {
+		return err.Error()
+	}
+	d := time.Duration(secs * float64(time.Second))
+	time.Sleep(d)
 	return ""
 }

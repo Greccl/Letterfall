@@ -34,7 +34,7 @@ func rain_resize() {
 	}
 }
 
-func rain_tick() {
+func tick_rain() {
 	generator_0()
 	if syncSpeed > 0 {
 		syncCount++
@@ -120,53 +120,63 @@ func generator_1() {
 */
 
 var genCounter int
-var density float32 = 0.6
+var genFrameDuration int = 350
+var density float32 = 1.0 // amount of new drops per chunk
 var spawnLeft float32
 
 func generator_0() {
 	genCounter += frameDuration
-	if genCounter < 333 { return }
-	genCounter = 0
+	if genCounter < genFrameDuration { return }
+	genCounter -= genFrameDuration
 
-	chunks := float32(scrw) / 10.0 / 3.0
+	chunks := float32(scrw) / 10.0
+   // chunkSize := scrw / chunks
 	newCount := chunks + spawnLeft
 	newCount *= density
 
+	// guard. 1 mutant per generator iteration
 	var mutantSpawned bool
+
+	// generation loop
 	for ; newCount >= 1.0; newCount -= 1.0 {
+		// inital column number to be spawned
 		x := rand.IntN((scrw+oddOffset)/2) * 2
-		allowDups := rand.Float32() < 0.0001
+
+		// find columns with fewer drops
+		allowDups := rand.Float32() < 0.001
 		if !allowDups {
 			initialx := x
-			MAX: for max:=0; max<5; max++ {
+			delta := 2
+			MAX: for max:=0; max<maxDropsPerColumn; max++ {
 				x = initialx
-				delta := 2
 				for {
 					if cols[x].count == max { break MAX }
-				
 					x = x + delta
-					// delta *= 2
-					// delta *= -2
 					if x >= scrw { x = 0 }
-					// if x
 					if x == initialx { break }
 				}
 			}
 		}
 
+		// discard if reached max drop amount in target column
 		if cols[x].count >= maxDropsPerColumn {
 			continue
 		}
 
+		// las drop in target column
 		var zero *Drop
 		if cols[x].count > 0 {
 			zero = &cols[x].drops[cols[x].count-1]
 			if zero.pos < overlap { continue }
 		}
 		
-		mut := rand.IntN(1000) < 50
-		if mut && mutantSpawned { continue }
-		
+		// select drop type
+		mut := false
+		if !mutantSpawned {
+			mut = rand.Float32() < mutantChance
+		}
+
+		// setup new drop
 		d := cols[x].newDrop()
 		d.reset()
 		if mut {
@@ -218,10 +228,10 @@ func generator_0() {
 
 
 
-var backSpeed int = 25
+var backSpeed int = 50
 var backCount int
 
-func back_tick() {
+func tick_back() {
 	back_generator_0()
 	backCount++
 	if backCount < backSpeed { return }
@@ -231,44 +241,45 @@ func back_tick() {
 	}
 }
 
-
-
-
-var backSpawnDelay int = 1050
+var backSpawnDelay int = 1200
+var backSpawnAmount int = 1
 var backSpawnCounter int
+var maxBacksPerColumn int = 2
 
 func back_generator_0() {
 	backSpawnCounter += frameDuration
 	if backSpawnCounter < backSpawnDelay { return }
 	backSpawnCounter = 0
 
-	x := rand.IntN(scrw)
-	initialx := x
-	MAX: for max:=0; max<5; max++ {
-		x = initialx
-		for {
-			if backs[x].count == max { break MAX }
-			x++
-			if x >= scrw { x = 0 }
-			if x == initialx { break }
+	for i:=0; i<backSpawnAmount; i++ {
+		x := rand.IntN(scrw)
+		initialx := x
+		MAX: for max:=0; max<maxBacksPerColumn; max++ {
+			x = initialx
+			for {
+				if backs[x].count == max { break MAX }
+				x++
+				if x >= scrw { x = 0 }
+				if x == initialx { break }
+			}
 		}
-	}
 
-	if backs[x].count >= maxDropsPerColumn {
-		return
-	}
+		if backs[x].count >= maxBacksPerColumn {
+			return
+		}
 
-	var zero *Drop
-	if backs[x].count > 0 {
-		zero = &backs[x].drops[backs[x].count-1]
-		if zero.pos < overlap { return }
+		var zero *Drop
+		if backs[x].count > 0 {
+			zero = &backs[x].drops[backs[x].count-1]
+			if zero.pos < overlap { return }
+		}
+		
+		d := backs[x].newDrop()
+		d.reset()
+		d.makeBackdrop()
+		if zero != nil {
+			d.pos = zero.pos - zero.length - 3
+		}
+		if d.pos > 0 { d.pos = 0 }
 	}
-	
-	d := backs[x].newDrop()
-	d.reset()
-	d.makeBackdrop()
-	if zero != nil {
-		d.pos = zero.pos - zero.length - 3
-	}
-	if d.pos > 0 { d.pos = 0 }
 }

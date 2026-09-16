@@ -100,6 +100,7 @@ var scrw, scrh int
 var ch_Draw = make(chan bool, 1)
 var state [][]CellState
 var oddOffset int
+var reservedHeight int
 
 
 
@@ -115,6 +116,7 @@ func resize() {
 	}
 	rain_resize()
 	scr.Clear()
+	// resizeEditor()
 }
 
 func damage() {
@@ -131,9 +133,14 @@ func printText(x, y int, s string) {
 	damage()
 }
 
+func printCell(x, y int, r rune, s tcell.Style) {
+	scr.SetContent(x, y, r, nil, s)
+	damage()
+}
+
 func drawCell(layer int8, x, y int, r rune, s tcell.Style) {
-	if x >= scrw { return }
-	if y >= scrh { return }
+	if x < 0 || x >= scrw { return }
+	if y < 0 || y >= scrh { return }
 	cell := &state[x][y]
 	cell.data[layer].r = r
 	cell.data[layer].s = s
