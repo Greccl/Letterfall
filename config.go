@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"strconv"
+	// "math"
 	"path/filepath"
 	"github.com/spf13/pflag"
 )
@@ -17,16 +18,24 @@ var backHead, backNeck, backTail Color
 var backCharset int
 // var backChar rune
 
+type SyncGroup struct {
+	speed float64
+	count float64
+	advance int
+}
+
 var normalHead, normalNeck, normalTail Color
 var normalMinLen, normalMaxLen int
-var normalMinSpeed, normalMaxSpeed int
-var normalSpeedStep int
+var normalMinSpeed, normalMaxSpeed float64
+var normalDeltaSpeed float64
+var normalGroupCount int
 var normalCharset int
+var normalSyncGroups []SyncGroup //= make([]SyncGroup, 1)
 
 var mutantHead, mutantNeck, mutantTail Color
 var mutantMinLen, mutantMaxLen int
-var mutantMinSpeed, mutantMaxSpeed int
-var mutantSpeedStep int
+var mutantMinSpeed, mutantMaxSpeed float64
+// var mutantSpeedStep int
 var mutantCharset int
 var mutantChance float32
 
@@ -34,6 +43,33 @@ var frameDuration int
 var overlap int
 var maxDropsPerColumn int
 var syncSpeed int
+
+func normalizeNormalSpeed() {
+	if normalMaxSpeed < normalMinSpeed {
+		normalMaxSpeed = normalMinSpeed
+	}
+	f := (normalMaxSpeed - normalMinSpeed) / normalDeltaSpeed
+	// f = math.Ceil(f)
+	n := int(f)
+	if n < 1 { n = 1 }
+	n++
+	normalGroupCount = n
+	if len(normalSyncGroups) != n {
+		normalSyncGroups = make([]SyncGroup, n)
+		for i := range normalSyncGroups {
+			normalSyncGroups[i].speed = normalMinSpeed + (float64(i) * normalDeltaSpeed)
+		}
+	}
+	for i := range cols {
+		col := &cols[i]
+		for j := range col.drops {
+			drop := &col.drops[j]
+			l := drop.length
+			drop.makeNormal()
+			drop.length = l
+		}
+	}
+}
 
 func handleCommand_set(fs *pflag.FlagSet) string {
 	args := fs.Args()
@@ -56,6 +92,21 @@ func handleCommand_set(fs *pflag.FlagSet) string {
 		case "normalMaxLen":
 			value, err := strconv.Atoi(args[1])
 			if err == nil { normalMaxLen = value }
+		case "normalMinSpeed":
+			value, err := strconv.ParseFloat(args[1], 64)
+			if err != nil { break }
+			normalMinSpeed = value
+			normalizeNormalSpeed()
+		case "normalMaxSpeed":
+			value, err := strconv.ParseFloat(args[1], 64)
+			if err != nil { break }
+			normalMaxSpeed = value
+			normalizeNormalSpeed()
+		case "normalDeltaSpeed":
+			value, err := strconv.ParseFloat(args[1], 64)
+			if err != nil { break }
+			normalDeltaSpeed = value
+			normalizeNormalSpeed()
 
 		case "mutantHead":
 			color, err := parseColor(args[1])
@@ -122,9 +173,9 @@ func loadDefaults() {
 	// normalHead = Color{136, 204,   0}
 	// normalNeck = Color{ 51, 153,  51}
 	// normalTail = Color{  0,  25,   0}
-	normalMinSpeed = 1
-	normalMaxSpeed = 2
-	normalSpeedStep = 5
+	normalMinSpeed = 2
+	normalMaxSpeed = 4
+	normalDeltaSpeed = 2.0
 	normalMinLen = 8
 	normalMaxLen = 16
 	normalCharset = 1
@@ -134,13 +185,13 @@ func loadDefaults() {
 	mutantHead = Color{204, 153, 255}
 	mutantNeck = Color{250, 255, 250}
 	mutantTail = Color{  0, 204, 122}
-	mutantMinSpeed = 1
-	mutantMaxSpeed = 1
-	mutantSpeedStep = 1
+	mutantMinSpeed = 65.0
+	mutantMaxSpeed = 100.0
+	// mutantSpeedStep = 1
 	mutantMinLen = 12
 	mutantMaxLen = 24
 	mutantCharset = 0
-	mutantChance = 0.4
+	mutantChance = 0.0
 
 	frameDuration = 20
 	overlap = 5

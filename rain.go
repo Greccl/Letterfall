@@ -18,6 +18,7 @@ var rainStatus bool
 
 func rain_init() {
 	addTickCallback(0.0, rain_tick)
+	normalizeNormalSpeed()
 }
 
 func rain_resize() {
@@ -40,16 +41,15 @@ func rain_resize() {
 
 func rain_tick(dt float64) {
 	generator_0(dt)
-	if syncSpeed > 0 {
-		syncCount++
-		if syncCount >= syncSpeed {
-			syncCount = 0
-			syncAdvance = true
+	for i := range normalSyncGroups {
+		g := &normalSyncGroups[i]
+		g.count += g.speed * dt
+		if g.count >= 1.0 {
+			g.advance = int(g.count)
+			g.count -= float64(g.advance)
 		} else {
-			syncAdvance = false
+			g.advance = 0
 		}
-	} else if syncSpeed < 0 {
-		syncCount++
 	}
 	for i := 0; i < len(cols); i++ {
 		cols[i].tick(dt)
@@ -123,7 +123,7 @@ func generator_0(dt float64) {
 			}
 			if d.pos > 0 { d.pos = 0 }
 			if syncSpeed < 0 {
-				d.count = syncCount % d.speed
+				// d.count = syncCount % d.speed
 			}
 		}
 	}
@@ -149,13 +149,13 @@ func generator_0(dt float64) {
 var backSpeed int = 50
 var backCount int
 
-func tick_back() {
+func tick_back(dt float64) {
 	back_generator_0()
 	backCount++
 	if backCount < backSpeed { return }
 	backCount = 0
 	for i := 0; i < len(backs); i++ {
-		backs[i].tick()
+		backs[i].tick(dt)
 	}
 }
 

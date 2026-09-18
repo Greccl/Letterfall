@@ -181,7 +181,7 @@ func main() {
 	minishell_toggle()
 
 	// Global ticker
-	ticker := time.NewTicker(50 * time.Millisecond)
+	ticker := time.NewTicker(25 * time.Millisecond)
 	defer ticker.Stop()
 	last := time.Now()
 

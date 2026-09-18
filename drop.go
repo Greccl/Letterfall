@@ -15,19 +15,23 @@ type Drop struct {
 	length int
 	head int
 	end int
+	lastEnd int
 	dirty bool
 
-	speed int
-	count int
+	group int
+	speed float64
+	count float64
 }
 
 
 
 func (self *Drop) makeNormal() {
+	// if normalGroupCount == 1 {
+		// self.group = 0
+	// } else {
+		self.group = rand.IntN(normalGroupCount)
+	// }
 	self.mutant = false
-	// self.lucent = false
-	self.speed = rand.IntN(normalMaxSpeed-normalMinSpeed+1) + normalMinSpeed
-	self.speed = self.speed * normalSpeedStep
 	self.length = rand.IntN(normalMaxLen-normalMinLen) + normalMinLen
 	self.resetRunes(normalCharset)
 }
@@ -35,8 +39,9 @@ func (self *Drop) makeNormal() {
 func (self *Drop) makeMutant() {
 	self.mutant = true
 	// self.lucent = false
-	self.speed = rand.IntN(mutantMaxSpeed-mutantMinSpeed+1) + mutantMinSpeed
-	self.speed *= mutantSpeedStep
+	// self.speed = rand.IntN(mutantMaxSpeed-mutantMinSpeed+1) + mutantMinSpeed
+	self.speed = mutantMinSpeed + rand.Float64() * (mutantMaxSpeed - mutantMinSpeed)
+	// self.speed *= mutantSpeedStep
 	self.length = rand.IntN(mutantMaxLen-mutantMinLen) + mutantMinLen
 	self.resetRunes(mutantCharset)
 }

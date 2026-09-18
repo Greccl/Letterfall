@@ -30,12 +30,6 @@ func (self *Column) resize() {
 	self.backs.runes = SliceResize(self.backs.runes, scrh)
 }
 
-
-
-
-
-
-
 func (self *Column) newDrop() *Drop {
 	if self.count == len(self.drops) {
 		self.drops = append(self.drops, Drop{})
@@ -54,7 +48,7 @@ func (self *Column) remove(i int) {
 	self.count--
 }
 
-func (self *Column) tick() {
+func (self *Column) tick(dt float64) {
 	// self.backTick()
 	if self.count == 0 { return }
 	self.visibleCount = 0
@@ -64,18 +58,33 @@ func (self *Column) tick() {
 	// Advance
 	for i:=self.count-1; i>=0; i-- {
 		d = &self.drops[i]
+		var g *SyncGroup
+		if d.mutant {
+			continue
+		} else {
+			g = &normalSyncGroups[d.group]
+		}
+		if g.advance > 0 {
+			d.pos += g.advance
+			d.dirty = true
+		} else {
+			continue
+		}
+/*
+		d.count += d.speed * dt
+		if d.count < 1.0 { continue }
+		d.dirty = true
+		adv := int(d.count)
+		d.pos += adv
+		d.count -= float64(adv)
+*/
 
-		trueAdvance := false
+/*		trueAdvance := false
 		if d.mutant || syncSpeed <= 0 {
 			d.count++
 			if d.count >= d.speed { trueAdvance = true }
 		} else
-		/*
-		if syncSpeed == -1 && syncCount % d.speed == 0 {
-			d.count++
-			if d.count >= d.speed { trueAdvance = true }
-		} else
-		*/
+
 		if syncAdvance {
 			trueAdvance = true
 		}
@@ -87,7 +96,7 @@ func (self *Column) tick() {
 		} else {
 			continue
 		}
-		
+*/		
 		// Check overlaps
 		if i > 0 {
 			if d.pos >= self.drops[i-1].pos {
