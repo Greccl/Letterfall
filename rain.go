@@ -16,8 +16,12 @@ var syncAdvance bool
 var rainStatus bool
 
 
+func rain_init() {
+	addTickCallback(0.0, rain_tick)
+}
 
 func rain_resize() {
+	spawnRatio = float64(scrw) / 10.0  * density
 	if scrw == 0 { return }
 	cols = SliceResize(cols, scrw)
 	backs = SliceResize(backs, scrw)
@@ -34,8 +38,8 @@ func rain_resize() {
 	}
 }
 
-func rain_tick() {
-	generator_0()
+func rain_tick(dt float64) {
+	generator_0(dt)
 	if syncSpeed > 0 {
 		syncCount++
 		if syncCount >= syncSpeed {
@@ -48,7 +52,7 @@ func rain_tick() {
 		syncCount++
 	}
 	for i := 0; i < len(cols); i++ {
-		cols[i].tick()
+		cols[i].tick(dt)
 	}
 	damage()
 }
@@ -56,94 +60,24 @@ func rain_tick() {
 
 
 
-/*
-var gen1time int
 
-func fgen(a, b float64) int {
-	for i:=0; i<3; i++ {
-		
-	}
-}
+var density float64 = 1.0 // amount of new drops per chunk of 10 columns
+var spawnLeft float64
+var spawnRatio float64
 
-func f0(x, max int) int {
-	sin := math.Sin
-	xx := float64(x)
-	// y := int(1*sin(1*xx) + 2*sin(0.5*xx) + 0.25*sin(4*xx))
-	y := int(2*sin(xx/4))
-	if y > max { y = max }
-	return y
-}
-
-func f1(x, max int) int {
-	sin := math.Sin
-	xx := float64(x)
-	// y := int(1*sin(1*xx) + 2*sin(0.5*xx) + 0.25*sin(4*xx))
-	y := int(3*sin(xx/4))+2
-	if y > max { y = max }
-	return y
-}
-
-func generator_1() {
-	if gen1time > 0 {
-		gen1time--
-		return
-	}
-	
-	gen1time = 200
-	boxh := 10
-	speed := 10
-	// var lasty int
-	var change bool
-	var f = f0
-	var lap int
-	for x := range cols {
-		// y := 0 - rand.IntN(boxh)
-		var y int
-		if x > scrw/2 { change = true }
-		if change {
-			switch lap {
-				case 0: f = f1
-			}
-			y = -5 + f(x, boxh)
-			change = false
-		} else {
-			y = -5 + f(x, boxh)
-		}
-		// lasty = y
-		d := cols[x].newDrop()
-		d.reset()
-		d.makeNormal()
-		d.speed = speed
-		d.pos = y
-	}
-}
-*/
-
-var genCounter int
-var genFrameDuration int = 350
-var density float32 = 1.0 // amount of new drops per chunk
-var spawnLeft float32
-
-func generator_0() {
-	genCounter += frameDuration
-	if genCounter < genFrameDuration { return }
-	genCounter -= genFrameDuration
-
-	chunks := float32(scrw) / 10.0
-   // chunkSize := scrw / chunks
-	newCount := chunks + spawnLeft
-	newCount *= density
+func generator_0(dt float64) {
+	spawnLeft += spawnRatio * dt
 
 	// guard. 1 mutant per generator iteration
 	var mutantSpawned bool
 
 	// generation loop
-	for ; newCount >= 1.0; newCount -= 1.0 {
+	for ; spawnLeft >= 1.0; spawnLeft -= 1.0 {
 		// inital column number to be spawned
 		x := rand.IntN((scrw+oddOffset)/2) * 2
 
 		// find columns with fewer drops
-		allowDups := rand.Float32() < 0.001
+		allowDups := rand.Float64() < 0.001
 		if !allowDups {
 			initialx := x
 			delta := 2
@@ -193,22 +127,6 @@ func generator_0() {
 			}
 		}
 	}
-
-	spawnLeft = newCount
-	/*
-	for i := 0; i < newCount; i++ {
-		if rand.IntN(1000) < 25 { // 15
-			x := rand.IntN(scrw/2)
-			x *= 2
-			x++
-			if x >= scrw { continue }
-			if cols[x].backs.speed > 0 {
-				continue
-			}
-			cols[x].addBackDrop()
-		}
-	}
-	*/
 }
 
 

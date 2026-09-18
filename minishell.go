@@ -20,12 +20,12 @@ var mshCommandHandler = NewCommandHandler(SCOPE_SHELL)
 var mshHistory = make([]string, 0)
 var mshHistoryPos int = -1
 
-func init_minishell() {
-	mshTickId = addTickCallback(600, minishell_tickCallback)
+func minishell_init() {
+	mshTickId = addTickCallback(0.6, minishell_tickCallback)
 	mshResizeId = addResizeListener(minishell_resizeCallback)
 }
 
-func minishell_tickCallback() {
+func minishell_tickCallback(dt float64) {
 	mshCursorBlink = !mshCursorBlink
 	minishell_draw()
 }

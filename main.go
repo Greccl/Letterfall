@@ -46,13 +46,6 @@ func postEvent(e int) {
 	scr.PostEvent(&ie)
 }
 
-func tick() {
-	tick_text()
-	tick_stream()
-	tick_rain()
-	tick_back()
-}
-
 var onRune func(rune)
 var onKey func(tcell.Key)
 
@@ -90,15 +83,15 @@ func handleKey(ev *tcell.EventKey) {
 
 
 type TickTask struct {
-	interval int
-	elapsed int
+	interval float64
+	elapsed float64
 	runing bool
-	callback func()
+	callback func(float64)
 }
 
 var tickRegistry = make([]TickTask, 0)
 
-func addTickCallback(interval int, callback func()) int {
+func addTickCallback(interval float64, callback func(float64)) int {
 	var task TickTask
 	task.interval = interval
 	task.callback = callback
@@ -110,6 +103,7 @@ func addTickCallback(interval int, callback func()) int {
 func setTickStatus(i int, status bool) {
 	if i >= len(tickRegistry) { return }
 	tickRegistry[i].runing = status
+	tickRegistry[i].elapsed = 0.0
 }
 
 func resetTick(i int) {
@@ -117,14 +111,14 @@ func resetTick(i int) {
 	tickRegistry[i].elapsed = 0
 }
 
-func tickCycle() {
+func tickCycle(dt float64) {
 	for i := range tickRegistry {
 		t := &tickRegistry[i]
 		if !t.runing { continue }
-		t.elapsed += frameDuration
+		t.elapsed += dt
 		if t.elapsed >= t.interval {
-			t.callback()
-			t.elapsed -= t.interval
+			t.callback(t.elapsed)
+			t.elapsed = 0.0
 		}
 	}
 }
@@ -181,48 +175,44 @@ func main() {
 	}()
 
 	// Other inits
-	init_minishell()
+	minishell_init()
+	rain_init()
 
 	minishell_toggle()
 
-	// A timer to update animations
-	ch_Tick := time.Tick(time.Duration(frameDuration)*time.Millisecond)
+	// Global ticker
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	last := time.Now()
 
 	// Setup step, wait for resize event or abort
 	// if a timeout is reached (is 1 second enough?)
-	initTimeout := 0
-
-	INIT:
-	for {
+	INIT: for {
 		select {
 			case ev := <- ch_ScreenEvents:
 				switch ev := ev.(type) {
 					case *tcell.EventKey:
 						if ev.Key() == tcell.KeyEscape {
-							initTimeout = -2
-							break INIT
+							fmt.Println("initialization aborted")
+							return
 						}
 					case *tcell.EventResize:
 						resize()
 						callResizeListeners()
-						initTimeout = 0
 						break INIT
 				}
-			case <- ch_Tick:
-				initTimeout += frameDuration
-				if initTimeout >= 1000 {
-					break INIT
+			case <- ticker.C:
+		   	now := time.Now()
+				if now.Sub(last).Seconds() >= 1.0 {
+					fmt.Println("screen initialization tiemout reached")
+					return
 				}
+				last = now
 		}
-	}
-	
-	if initTimeout != 0 {
-		return // Timeout reached or aborted by Esc key
 	}
 
 	// Main loop
-	LOOP:
-	for {
+	LOOP:	for {
 		select {
 			case ev := <- ch_ScreenEvents:
 				switch ev := ev.(type) {
@@ -239,7 +229,7 @@ func main() {
 								rainStatus = !rainStatus
 							case EVENT_STEP:
 								if !rainStatus {
-									tick()
+									tickCycle(0.25)
 								}
 						}
 				}
@@ -247,10 +237,12 @@ func main() {
 				req.hnd.do(req.cmd)
 			case <- ch_Draw:
 				scr.Show()
-			case <- ch_Tick:
-				tickCycle()
+			case <- ticker.C:
+		   	now := time.Now()
+		   	dt := now.Sub(last)
+		   	last = now
 				if rainStatus {
-					tick()
+					tickCycle(dt.Seconds())
 				}
 		}
 	}
