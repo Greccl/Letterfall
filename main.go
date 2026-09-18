@@ -182,6 +182,7 @@ func main() {
 
 	// Other inits
 	init_minishell()
+
 	minishell_toggle()
 
 	// A timer to update animations

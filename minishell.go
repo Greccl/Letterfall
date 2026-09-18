@@ -16,7 +16,7 @@ var mshCursorPos int
 var mshCursorBlink bool
 var mshTickId int = -1
 var mshResizeId int = -1
-var mshCommandHandler = NewCommandHandler(HANDLER_TYPE_SHELL)
+var mshCommandHandler = NewCommandHandler(SCOPE_SHELL)
 var mshHistory = make([]string, 0)
 var mshHistoryPos int = -1
 

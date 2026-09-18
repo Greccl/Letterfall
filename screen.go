@@ -16,6 +16,10 @@ type Color struct {
 	r, g, b int32
 }
 
+func (c *Color) toString() string {
+	return fmt.Sprintf("rgb(%d,%d,%d)", c.r, c.g, c.b)
+}
+
 func blend(a, b Color, alfa int32) Color {
 	var c Color
 	beta := 1000 - alfa
@@ -28,20 +32,19 @@ func blend(a, b Color, alfa int32) Color {
 func parseColor(s string) (c Color, err error) {
 	s = strings.TrimSpace(s)
 
-	// #RRGGBB
-	if strings.HasPrefix(s, "#") {
-		if len(s) != 7 { return }
+	// 0xRRGGBB
+	if strings.HasPrefix(s, "0x") {
+		if len(s) != 8 { return }
 		var i64 int64
-		i64, err = strconv.ParseInt(s[1:3], 16, 0)
+		i64, err = strconv.ParseInt(s[2:4], 16, 0)
 		if err != nil { return }
 		c.r = int32(i64)
-		i64, err = strconv.ParseInt(s[3:5], 16, 0)
+		i64, err = strconv.ParseInt(s[4:6], 16, 0)
 		if err != nil { return }
 		c.g = int32(i64)
-		i64, err = strconv.ParseInt(s[5:7], 16, 0)
+		i64, err = strconv.ParseInt(s[6:8], 16, 0)
 		if err != nil { return }
 		c.b = int32(i64)
-		// if true {panic(err)}
 		return c, nil
 	}
 

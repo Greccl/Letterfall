@@ -11,6 +11,14 @@ import (
 
 
 
+const (
+	SCOPE_MAIN int = 1 << iota
+	SCOPE_INIT
+	SCOPE_CONN
+	SCOPE_FILE
+	SCOPE_SHELL
+)
+
 type Command struct {
 	flagset *pflag.FlagSet
 	doInMain bool
@@ -18,7 +26,7 @@ type Command struct {
 	mu sync.Mutex
 }
 
-func NewCommandMap(kind int) map[string]*Command {
+func buildCommandMap(scope int) map[string]*Command {
 	var cmd *Command
 	var fset *pflag.FlagSet
 	var commands = make(map[string]*Command)
@@ -27,9 +35,23 @@ func NewCommandMap(kind int) map[string]*Command {
 	fset = pflag.NewFlagSet("set", pflag.ContinueOnError)
 	cmd = new(Command)
 	cmd.flagset = fset
-	cmd.doInMain = true
+	cmd.doInMain = false
 	cmd.handle = handleCommand_set
 	commands["set"] = cmd
+
+	if scope == SCOPE_INIT {
+		return commands
+	}
+
+	// SAVE
+	if scope & SCOPE_SHELL != 0 {
+		fset = pflag.NewFlagSet("save", pflag.ContinueOnError)
+		cmd = new(Command)
+		cmd.flagset = fset
+		cmd.doInMain = true
+		cmd.handle = handleCommand_save
+		commands["save"] = cmd
+	}
 
 	// TEXT
 	fset = pflag.NewFlagSet("text", pflag.ContinueOnError)
@@ -59,7 +81,7 @@ func NewCommandMap(kind int) map[string]*Command {
 	commands["banner"] = cmd
 
 	// STREAM
-	if kind != HANDLER_TYPE_SHELL {
+	if scope & SCOPE_SHELL == 0 {
 		fset = pflag.NewFlagSet("stream", pflag.ContinueOnError)
 		fset.IntSliceP("position"  , "p", []int{}, "a compact way to set x and y position")
 		fset.IntP     ("x"         , "x", 0      , "x position of text box")
@@ -81,7 +103,7 @@ func NewCommandMap(kind int) map[string]*Command {
 	}
 
 	// SLEEP
-	if kind != HANDLER_TYPE_INIT && kind != HANDLER_TYPE_SHELL {
+	if scope & SCOPE_SHELL == 0 {
 		fset = pflag.NewFlagSet("sleep", pflag.ContinueOnError)
 		cmd = new(Command)
 		cmd.flagset = fset
@@ -104,22 +126,14 @@ func NewCommandMap(kind int) map[string]*Command {
 // request by the request channel polled in main().
 // if not, it is executed immediatelly.
 
-const (
-	HANDLER_TYPE_MAIN int = iota
-	HANDLER_TYPE_INIT
-	HANDLER_TYPE_CONN
-	HANDLER_TYPE_FILE
-	HANDLER_TYPE_SHELL
-)
-
 type CommandHandler struct {
 	commands map[string]*Command
 	writer *bufio.Writer
 }
 
-func NewCommandHandler(kind int) *CommandHandler {
-	self := new(CommandHandler)
-	self.commands = NewCommandMap(kind)
+func NewCommandHandler(scope int) *CommandHandler {
+	self := &CommandHandler{}
+	self.commands = buildCommandMap(scope)
 	return self
 }
 
@@ -152,42 +166,6 @@ func (self *CommandHandler) do(cmd *Command) {
 
 
 
-//
-// Helpers for FlagSet manipulation
-//
-
-func resetFlag(f *pflag.Flag) {
-	f.Value.Set(f.DefValue)
-	f.Changed = false
-}
-
-func getBool(fs *pflag.FlagSet, name string) (bool,bool) {
-	f := fs.Lookup(name)
-	if !f.Changed { return false, false }
-	value, _ := fs.GetBool(name)
-	return true, value
-}
-
-func getInt(fs *pflag.FlagSet, name string) (bool,int) {
-	f := fs.Lookup(name)
-	if !f.Changed { return false, 0 }
-	value, _ := fs.GetInt(name)
-	return true, value
-}
-
-func getIntSlice(fs *pflag.FlagSet, name string) (bool,[]int) {
-	f := fs.Lookup(name)
-	if !f.Changed { return false, []int{} }
-	value, _ := fs.GetIntSlice(name)
-	return true, value
-}
-
-func getString(fs *pflag.FlagSet, name string) (bool,string) {
-	f := fs.Lookup(name)
-	if !f.Changed { return false, "" }
-	value, _ := fs.GetString(name)
-	return true, value
-}
 
 
 

@@ -5,15 +5,17 @@ import (
 	"bufio"
 	"net"
 	"fmt"
-	// "errors"
+	"strings"
+	"strconv"
 	"path/filepath"
 	"github.com/spf13/pflag"
 )
 
-var lucentHead, lucentBody Color
+var profile string = "default"
+
 var backHead, backNeck, backTail Color
 var backCharset int
-
+// var backChar rune
 
 var normalHead, normalNeck, normalTail Color
 var normalMinLen, normalMaxLen int
@@ -41,29 +43,77 @@ func handleCommand_set(fs *pflag.FlagSet) string {
 	switch args[0] {
 		case "normalHead":
 			color, err := parseColor(args[1])
-			if err == nil {
-				normalHead = color
-			}
+			if err == nil { normalHead = color }
 		case "normalNeck":
 			color, err := parseColor(args[1])
-			if err == nil {
-				normalNeck = color
-			}
+			if err == nil { normalNeck = color }
 		case "normalTail":
 			color, err := parseColor(args[1])
-			if err == nil {
-				normalTail = color
-			}
+			if err == nil { normalTail = color }
+		case "normalMinLen":
+			value, err := strconv.Atoi(args[1])
+			if err == nil { normalMinLen = value }
+		case "normalMaxLen":
+			value, err := strconv.Atoi(args[1])
+			if err == nil { normalMaxLen = value }
+
 		case "mutantHead":
 			color, err := parseColor(args[1])
-			if err == nil {
-				mutantHead = color
-			}
+			if err == nil { mutantHead = color }
+		case "mutantNeck":
+			color, err := parseColor(args[1])
+			if err == nil { mutantNeck = color }
+		case "mutantTail":
+			color, err := parseColor(args[1])
+			if err == nil { mutantTail = color }
 	}
 	return ""
 }
 
+func handleCommand_save(fs *pflag.FlagSet) string {
+	args := fs.Args()
+	if len(args) > 1 {
+		return ""
+	}
+	if len(args) == 0 {
+		saveProfile(profile)
+	} else {
+		saveProfile(args[0])
+	}
+	return ""
+}
 
+func saveProfile(name string) {
+	configDir, err := getConfigDir()
+	if err != nil { return }
+
+
+	tempPath := filepath.Join(configDir, name + ".temp.letterfall")
+	f, err := os.OpenFile(tempPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil { return }
+	defer f.Close()
+
+	fmt.Fprintln(f, "set normalHead", normalHead.toString())
+	fmt.Fprintln(f, "set normalNeck", normalNeck.toString())
+	fmt.Fprintln(f, "set normalTail", normalTail.toString())
+
+	basePath := filepath.Join(configDir, name + ".letterfall")
+	base, err := os.Open(basePath)
+	if err == nil {
+		defer base.Close()
+		scanner := bufio.NewScanner(base)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if !strings.HasPrefix(line, "set ") {
+				fmt.Fprintln(f, line)
+			}
+		}
+	}
+
+	f.Close()
+	base.Close()
+	os.Rename(tempPath, basePath)
+}
 
 func loadDefaults() {
 	normalHead = Color{255, 153,   0}
@@ -119,29 +169,29 @@ func scanFile(f *os.File, hnd *CommandHandler) {
 }
 
 func readCommandLine() {
-	hnd := NewCommandHandler(HANDLER_TYPE_INIT)
+	hnd := NewCommandHandler(SCOPE_INIT)
 
-	// files      := pflag.StringSliceP("file"    , "f", []string{}, "[path] file for reading commands")
-	// configPath := pflag.StringP     ("config"  , "c", ""        , "[path] configuration file")
-	socket     := pflag.StringP     ("socket"  , "s", "0"       , "create a server socket to read commands")
-	sockpath   := pflag.Bool("socket-path", false, "print socket path and exit")
+	socket := pflag.StringP("socket", "s", "0", "create a server socket to read commands")
+	sockpath := pflag.Bool("socket-path", false, "print socket path and exit")
 	pflag.Parse()
 
 	configDir, err := getConfigDir()
 
 	if err == nil {
 		if pflag.NArg() > 0 {
-			profile := filepath.Join(configDir, pflag.Args()[0], ".letterfall")
-			f, err := os.Open(profile)
+			path := filepath.Join(configDir, pflag.Args()[0] + ".letterfall")
+			f, err := os.Open(path)
 			if err == nil {
+				profile = pflag.Args()[0]
 				scanFile(f, hnd)
 			} else {
 				fmt.Printf("error loading profile %s: %s", pflag.Args()[0], err.Error())
 				os.Exit(1)
 			}
 		} else {
-			profile := filepath.Join(configDir, "config", ".letterfall")
-			f, err := os.Open(profile)
+			path := filepath.Join(configDir, "default.letterfall")
+			profile = "default"
+			f, err := os.Open(path)
 			if err == nil {
 				scanFile(f, hnd)
 			}
@@ -159,11 +209,6 @@ func readCommandLine() {
 		go initServer(socketPath)
 	}
 
-	// proccess non-flag arguments as comands
-	// for _, cmd := range pflag.Args() {
-		// hnd.eval(cmd)
-	// }
-
 	// Check if our program was redirected from a pipe
 	info, err := os.Stdin.Stat()
 	if err != nil {
@@ -173,7 +218,7 @@ func readCommandLine() {
 	if (info.Mode() & os.ModeCharDevice) == 0 {
 		// its a pipe, read stdin as a command source
 		go func() {
-			hnd := NewCommandHandler(HANDLER_TYPE_FILE)
+			hnd := NewCommandHandler(SCOPE_FILE)
 			sc := bufio.NewScanner(os.Stdin)
 			for sc.Scan() {
 				line := sc.Text()
@@ -200,7 +245,7 @@ func handleConn(conn net.Conn) {
 	defer conn.Close()
 
 	reader := bufio.NewScanner(conn)
-	hnd := NewCommandHandler(HANDLER_TYPE_CONN)
+	hnd := NewCommandHandler(SCOPE_CONN)
 	hnd.writer = bufio.NewWriter(conn)
 
 	for reader.Scan() {
@@ -213,7 +258,7 @@ func readCommandFile(path string) {
 	f, err := os.Open(path)
 	if err != nil { return }
 	defer f.Close()
-	hnd := NewCommandHandler(HANDLER_TYPE_FILE)
+	hnd := NewCommandHandler(SCOPE_FILE)
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		line := sc.Text()

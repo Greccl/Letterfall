@@ -34,7 +34,7 @@ func rain_resize() {
 	}
 }
 
-func tick_rain() {
+func rain_tick() {
 	generator_0()
 	if syncSpeed > 0 {
 		syncCount++
