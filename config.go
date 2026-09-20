@@ -27,7 +27,7 @@ type SyncGroup struct {
 var normalHead, normalNeck, normalTail Color
 var normalMinLen, normalMaxLen int
 var normalMinSpeed, normalMaxSpeed float64
-var normalDeltaSpeed float64
+var normalSpeedStep float64
 var normalGroupCount int
 var normalCharset int
 var normalSyncGroups []SyncGroup //= make([]SyncGroup, 1)
@@ -48,17 +48,17 @@ func normalizeNormalSpeed() {
 	if normalMaxSpeed < normalMinSpeed {
 		normalMaxSpeed = normalMinSpeed
 	}
-	f := (normalMaxSpeed - normalMinSpeed) / normalDeltaSpeed
+	f := (normalMaxSpeed - normalMinSpeed) / normalSpeedStep
 	// f = math.Ceil(f)
 	n := int(f)
-	if n < 1 { n = 1 }
+	if n < 0 { n = 0 }
 	n++
 	normalGroupCount = n
 	if len(normalSyncGroups) != n {
 		normalSyncGroups = make([]SyncGroup, n)
-		for i := range normalSyncGroups {
-			normalSyncGroups[i].speed = normalMinSpeed + (float64(i) * normalDeltaSpeed)
-		}
+	}
+	for i := range normalSyncGroups {
+		normalSyncGroups[i].speed = normalMinSpeed + (float64(i) * normalSpeedStep)
 	}
 	for i := range cols {
 		col := &cols[i]
@@ -69,6 +69,24 @@ func normalizeNormalSpeed() {
 			drop.length = l
 		}
 	}
+}
+
+func handleCommand_get(fs *pflag.FlagSet) string {
+	args := fs.Args()
+	if len(args) < 1 { return "" }
+	switch args[0] {
+		case "normalColors":
+			return fmt.Sprintf("head:%s / neck:%s / tail:%s", normalHead.toString(), normalNeck.toString(), normalTail.toString())
+		case "normalSpeed":
+			return fmt.Sprintf("min:%f / max:%f / step:%f", normalMinSpeed, normalMaxSpeed, normalSpeedStep)
+		case "normalSpeedDebug":
+			var s string
+			for i := range normalSyncGroups {
+				s += fmt.Sprintf(" %.3f", normalSyncGroups[i].speed)
+			}
+			return fmt.Sprintf("groupCount:%d / groups(%d):%s", normalGroupCount, len(normalSyncGroups), s)
+	}
+	return ""
 }
 
 func handleCommand_set(fs *pflag.FlagSet) string {
@@ -102,10 +120,22 @@ func handleCommand_set(fs *pflag.FlagSet) string {
 			if err != nil { break }
 			normalMaxSpeed = value
 			normalizeNormalSpeed()
-		case "normalDeltaSpeed":
+		case "normalSpeedStep":
 			value, err := strconv.ParseFloat(args[1], 64)
 			if err != nil { break }
-			normalDeltaSpeed = value
+			normalSpeedStep = value
+			normalizeNormalSpeed()
+		case "normalSpeed":
+			if len(args) < 4 { break }
+			v1, err := strconv.ParseFloat(args[1], 64)
+			if err != nil { return err.Error() }
+			v2, err := strconv.ParseFloat(args[2], 64)
+			if err != nil { return err.Error() }
+			v3, err := strconv.ParseFloat(args[3], 64)
+			if err != nil { return err.Error() }
+			normalMinSpeed = v1
+			normalMaxSpeed = v2
+			normalSpeedStep = v3
 			normalizeNormalSpeed()
 
 		case "mutantHead":
@@ -173,12 +203,12 @@ func loadDefaults() {
 	// normalHead = Color{136, 204,   0}
 	// normalNeck = Color{ 51, 153,  51}
 	// normalTail = Color{  0,  25,   0}
-	normalMinSpeed = 2
-	normalMaxSpeed = 4
-	normalDeltaSpeed = 2.0
+	normalMinSpeed = 1
+	normalMaxSpeed = 3
+	normalSpeedStep = 1
 	normalMinLen = 8
 	normalMaxLen = 16
-	normalCharset = 1
+	normalCharset = 2
 
 	backCharset = -2
 

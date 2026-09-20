@@ -18,6 +18,7 @@ type Column struct {
 	backs Drop
 }
 
+//var backrunes = []rune{9679, 9670, 9643, 9642, 9702, 9711}
 
 
 
@@ -122,7 +123,7 @@ func (self *Column) tick(dt float64) {
 	// Remove completed
 	if self.drops[0].end >= scrh {
 		self.remove(0)
-		releaseCell(self.layer, self.x, scrh-1)
+		screen_releaseCell(self.layer, self.x, scrh-1)
 	}
 
 	// Drawing
@@ -134,13 +135,6 @@ func (self *Column) tick(dt float64) {
 			self.draw(i)
 		}
 	}
-
-	/*
-	s := fmt.Sprintf("%2d", self.count)
-	for i := range s {
-		scr.SetContent(self.x+i, scrh, rune(s[i]), nil, tcell.StyleDefault)
-	}	
-	*/
 }
 
 func (self *Column) draw(i int) {
@@ -173,7 +167,7 @@ func (self *Column) draw(i int) {
 		if p == 0 {
 			s.SetForegroundRGB(head.r, head.g, head.b)
 		} else if p == l {
-			releaseCell(self.layer, self.x, y)
+			screen_releaseCell(self.layer, self.x, y)
 			continue
 		} else {
 			alfa := int32((d.length - p)*1000/d.length)
@@ -181,21 +175,8 @@ func (self *Column) draw(i int) {
 			c = blend(neck, tail, 1000-alfa)
 			s.SetForegroundRGB(c.r, c.g, c.b)
 		}
-		drawCell(self.layer, self.x, y, d.runes[y], s)
+		screen_drawCell(self.layer, self.x, y, d.runes[y], s)
 	}
 	
 	d.dirty = false
 }
-
-
-
-
-
-
-
-
-
-
-
-
-var backrunes = []rune{9679, 9670, 9643, 9642, 9702, 9711}

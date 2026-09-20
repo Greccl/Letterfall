@@ -351,11 +351,11 @@ func (self *Widget) save(b bool) {
 func (self *Widget) drawCell(x, y int, r rune) {
 	if x < 0 || x >= self.w { return }
 	if y < 0 || y >= self.h { return }
-	drawCell(self.layer, self.x+x, self.y+y, r, self.style)
+	screen_drawCell(self.layer, self.x+x, self.y+y, r, self.style)
 }
 
 func (self *Widget) putc(r rune) {
-	drawCell(self.layer, self.x+self.cx, self.y+self.cy, r, self.style)
+	screen_drawCell(self.layer, self.x+self.cx, self.y+self.cy, r, self.style)
 	self.cursorInc()
 }
 
@@ -408,7 +408,7 @@ func (self *Widget) layout() {
 func (self *Widget) releaseAll() {
 	for y:=0; y<self.seth; y++ {
 		for x:=0; x<self.setw; x++ {
-			releaseCell(self.layer, self.x+x, self.y+y)
+			screen_releaseCell(self.layer, self.x+x, self.y+y)
 		}
 	}
 }

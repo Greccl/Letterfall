@@ -3,14 +3,20 @@ package main
 import (
 	"github.com/Greccl/tcell/v2"
 	"slices"
+	"bufio"
 )
+
+type MinishellResponseWriter struct {}
 
 var mshActive bool
 var mshBuffer []rune = make([]rune, 0, 256)
+var mshResponseBuffer []rune
+var mshResponseWriter MinishellResponseWriter
 var mshSavedBuffer []rune
 var mshEnabled bool
-var mshStyle = tcell.StyleDefault.Background(tcell.ColorGray).Foreground(tcell.ColorBlack)
-var mshStyleRev = tcell.StyleDefault.Background(tcell.ColorBrown).Foreground(tcell.ColorGray)
+var mshStyle    = tcell.StyleDefault.Background(tcell.Color236).Foreground(tcell.Color250)
+var mshStyleRev = tcell.StyleDefault.Background(tcell.Color250).Foreground(tcell.Color232)
+var mshStyleRes = tcell.StyleDefault.Background(tcell.Color240).Foreground(tcell.Color232)
 var mshHeight int = -1
 var mshCursorPos int
 var mshCursorBlink bool
@@ -23,6 +29,7 @@ var mshHistoryPos int = -1
 func minishell_init() {
 	mshTickId = addTickCallback(0.6, minishell_tickCallback)
 	mshResizeId = addResizeListener(minishell_resizeCallback)
+	mshCommandHandler.writer = bufio.NewWriter(mshResponseWriter)
 }
 
 func minishell_tickCallback(dt float64) {
@@ -32,6 +39,35 @@ func minishell_tickCallback(dt float64) {
 
 func minishell_resizeCallback() {
 	minishell_resize()
+	minishell_draw()
+}
+
+func (self MinishellResponseWriter) Write(p []byte) (n int, err error) {
+	if len(p) > 0 {
+		mshResponseBuffer = slices.Concat(mshResponseBuffer, []rune(string(p)))
+		minishell_resize()
+	}
+	return len(p), nil
+}
+
+func minishell_resize() {
+	if scrw < 1 { return }
+	if scrh < 1 { return }
+	if !mshActive {
+		mshHeight = 0
+		reservedHeight = 0
+		screen_resize()
+		return
+	}
+	h := len(mshBuffer) / scrw + 1
+	if mshResponseBuffer != nil {
+		h += len(mshResponseBuffer) / scrw + 1
+	}
+	if h != mshHeight {
+		mshHeight = h
+		reservedHeight = h
+		screen_resize()
+	}
 	minishell_draw()
 }
 
@@ -45,6 +81,7 @@ func minishell_setString(str string) {
 func minishell_clear() {
 	mshBuffer = mshBuffer[0:0]
 	mshCursorPos = 0
+	minishell_resize()
 }
 
 func minishell_saveBuffer() {
@@ -63,9 +100,12 @@ func minishell_insert(r rune) {
 
 func minishell_print(x, y int, i int, r rune) int {
 	if i == mshCursorPos && mshCursorBlink {
-		printCell(x, y, r, mshStyleRev)
+		screen_printCell(x, y, r, mshStyleRev)
+	} else if i == -1 {
+		screen_printCell(x, y, r, mshStyleRes)
+		return 0
 	} else {
-		printCell(x, y, r, mshStyle)
+		screen_printCell(x, y, r, mshStyle)
 	}
 	return i+1
 }
@@ -76,14 +116,24 @@ func minishell_draw() {
 	z := scrh
 	h := mshHeight
 	x := 0
-	y := 1
+	y := 0
 	i := 0
-	for x = 0; x<scrw; x++ {
-		minishell_print(x, z, -1, '\u2580')
+	if mshResponseBuffer != nil {
+		for ; y < h && i<len(mshResponseBuffer); y++ {
+			for x = 0; x < scrw && i < len(mshResponseBuffer); x++ {
+				minishell_print(x, z+y, -1, mshResponseBuffer[i])
+				i++
+			}
+		}
+		y--
+		for ; x<scrw; x++ {
+			minishell_print(x, z+y, -1, ' ')
+		}
+		i = 0
+		y++
 	}
-	x = 0
 	for ; y < h; y++ {
-		for x = 0; x<scrw && i<len(mshBuffer); x++ {
+		for x = 0; x < scrw && i < len(mshBuffer); x++ {
 			i = minishell_print(x, z+y, i, mshBuffer[i])
 		}
 	}
@@ -91,24 +141,6 @@ func minishell_draw() {
 	for ; x<scrw; x++ {
 		i = minishell_print(x, z+y, i, ' ')
 	}
-}
-
-func minishell_resize() {
-	if scrw < 1 { return }
-	if scrh < 1 { return }
-	if !mshActive {
-		mshHeight = 0
-		reservedHeight = 0
-		resize()
-		return
-	}
-	h := len(mshBuffer) / scrw + 2 // one more line for top delimiter
-	if h != mshHeight {
-		mshHeight = h
-		reservedHeight = h
-		resize()
-	}
-	minishell_draw()
 }
 
 func minishell_toggle() {
@@ -166,6 +198,7 @@ func onKey_minishell(k tcell.Key) {
 			mshHistory = append(mshHistory, line)
 			mshHistoryPos = -1
 			mshSavedBuffer = nil
+			mshResponseBuffer = nil
 			minishell_clear()
 			mshCommandHandler.eval(line)
 		case tcell.KeyUp:
@@ -177,7 +210,7 @@ func onKey_minishell(k tcell.Key) {
 					minishell_saveBuffer()
 				}
 				mshHistoryPos++
-				minishell_setString(mshHistory[mshHistoryPos])
+				minishell_setString(mshHistory[len(mshHistory)-mshHistoryPos-1])
 				mshCursorPos = len(mshBuffer)
 			}
 		case tcell.KeyDown:
@@ -186,7 +219,7 @@ func onKey_minishell(k tcell.Key) {
 				if mshHistoryPos == -1 {
 					minishell_restoreBuffer()
 				} else {
-					minishell_setString(mshHistory[mshHistoryPos])
+					minishell_setString(mshHistory[len(mshHistory)-mshHistoryPos-1])
 				}
 				mshCursorPos = len(mshBuffer)
 			}

@@ -42,7 +42,7 @@ b.pix[3] = [3]rune{'⠸','⠀','⠸'}   // '▌' y '▐' → bordes laterales
 	if true {
 		for y := range b.pix {
 			for x := range b.pix[y] {
-				drawCell(LAYER_TEXT, b.x+x, b.y+y, b.pix[y][x], s)
+				screen_drawCell(LAYER_TEXT, b.x+x, b.y+y, b.pix[y][x], s)
 			}
 		}
 	}

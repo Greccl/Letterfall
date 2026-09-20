@@ -54,7 +54,7 @@ func rain_tick(dt float64) {
 	for i := 0; i < len(cols); i++ {
 		cols[i].tick(dt)
 	}
-	damage()
+	screen_damage()
 }
 
 

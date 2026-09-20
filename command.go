@@ -39,9 +39,24 @@ func buildCommandMap(scope int) map[string]*Command {
 	cmd.handle = handleCommand_set
 	commands["set"] = cmd
 
+	// Limit of init command list
 	if scope == SCOPE_INIT {
 		return commands
 	}
+
+	// GET
+	fset = pflag.NewFlagSet("get", pflag.ContinueOnError)
+	cmd = new(Command)
+	cmd.flagset = fset
+	cmd.doInMain = false
+	cmd.handle = handleCommand_get
+	commands["get"] = cmd
+
+	// PING
+	cmd = new(Command)
+	cmd.doInMain = false
+	cmd.handle = handleCommand_ping
+	commands["ping"] = cmd
 
 	// SAVE
 	if scope & SCOPE_SHELL != 0 {
@@ -143,19 +158,21 @@ func (self *CommandHandler) eval(line string) {
 	cmd, exists := self.commands[args[0]]
 	if !exists { return }
 	cmd.mu.Lock()
-	if len(args) > 1 {
+	if len(args) > 1 && cmd.flagset != nil {
 		cmd.flagset.Parse(args[1:])
 	}
 	if cmd.doInMain {
 		ch_HandleRequests <- HandleRequest{self, cmd}
-		return
+	} else {
+		self.do(cmd)
 	}
-	self.do(cmd)
 }
 
 func (self *CommandHandler) do(cmd *Command) {
 	result := cmd.handle(cmd.flagset)
-	cmd.flagset.VisitAll(resetFlag)
+	if cmd.flagset != nil {
+		cmd.flagset.VisitAll(resetFlag)
+	}
 	cmd.mu.Unlock()
 	if self.writer != nil && len(result) > 0 {
 		self.writer.WriteString(result)
@@ -171,6 +188,9 @@ func (self *CommandHandler) do(cmd *Command) {
 
 
 
+func handleCommand_ping(fs *pflag.FlagSet) string {
+	return "pong"
+}
 
 
 func handleCommand_state(fs *pflag.FlagSet) string {

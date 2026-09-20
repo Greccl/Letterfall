@@ -2,13 +2,8 @@ package main
 
 import (
 	"fmt"
-	// "os"
-	// "time"
 	"github.com/Greccl/tcell/v2"
 )
-
-
-
 
 
 
@@ -118,34 +113,34 @@ func drawEditor() {
 	s.SetBackgroundRGB(50, 50, 50)
 
 	basex, basey := output.posx, output.posy
-	printText(basex, basey, "output")
+	screen_printText(basex, basey, "output")
 	basey++
 	for y := range output.pix {
 		for x := range output.pix[y] {
-			printCell(basex+x, basey+y, output.pix[y][x], s)
+			screen_printCell(basex+x, basey+y, output.pix[y][x], s)
 		}
 	}
 
 	basex, basey = editor.posx, editor.posy
-	printText(basex, basey, "editor")
+	screen_printText(basex, basey, "editor")
 	basey++
 	for y := range editor.pix {
 		for x := range editor.pix[y] {
-			printCell(basex+x, basey+y, editor.pix[y][x], s)
+			screen_printCell(basex+x, basey+y, editor.pix[y][x], s)
 		}
 	}
 	s.SetBackgroundRGB(0, 100, 0)
-	printCell(basex+selx, basey+sely, editor.pix[sely][selx], s)
+	screen_printCell(basex+selx, basey+sely, editor.pix[sely][selx], s)
 	
 	basey = 7
 	s.SetBackgroundRGB(0,0,0)
 	for x := range chars {
-		printCell(x, basey, chars[x], s)
-		printCell(x, basey+1, ' ', s)
+		screen_printCell(x, basey, chars[x], s)
+		screen_printCell(x, basey+1, ' ', s)
 	}
 	basey++
-	printCell(charPos, basey, '^', s)
+	screen_printCell(charPos, basey, '^', s)
 	basey++
-	printText(0, basey, charField)
+	screen_printText(0, basey, charField)
 	
 }

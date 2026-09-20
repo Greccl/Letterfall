@@ -197,7 +197,7 @@ func main() {
 							return
 						}
 					case *tcell.EventResize:
-						resize()
+						screen_resize()
 						callResizeListeners()
 						break INIT
 				}
@@ -219,7 +219,7 @@ func main() {
 					case *tcell.EventKey:
 						handleKey(ev)
 					case *tcell.EventResize:
-						resize()
+						screen_resize()
 						callResizeListeners()
 					case *InternalEvent:
 						switch ev.event {
