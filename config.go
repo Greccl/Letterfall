@@ -92,7 +92,7 @@ func handleCommand_get(fs *pflag.FlagSet) string {
 func handleCommand_set(fs *pflag.FlagSet) string {
 	args := fs.Args()
 	if len(args) < 2 {
-		return ""
+		return "few arguments for set command"
 	}
 	switch args[0] {
 		case "normalHead":
@@ -137,6 +137,56 @@ func handleCommand_set(fs *pflag.FlagSet) string {
 			normalMaxSpeed = v2
 			normalSpeedStep = v3
 			normalizeNormalSpeed()
+		case "normalCharset":
+			switch args[1] {
+				case "next":
+					normalCharset++
+					if normalCharset >= CHARSET_COUNT {
+						if customCharsetA != nil {
+							normalCharset = CHARSET_CUSTOM_A
+						} else if customCharsetB != nil {
+							normalCharset = CHARSET_CUSTOM_B
+						} else {
+							normalCharset = CHARSET_DEFAULT
+						}
+					}
+					return "normal chatset -> " + charsetNames[normalCharset]
+				case "customA":
+					if len(customCharsetA) > 0 {
+						normalCharset = CHARSET_CUSTOM_A
+						return ""
+					}
+					return "no custom charset defined"
+				case "customB":
+					if len(customCharsetB) > 0 {
+						normalCharset = CHARSET_CUSTOM_B
+						return ""
+					}
+					return "no custom charset defined"
+				default:
+					for i:=CHARSET_DEFAULT; i<CHARSET_COUNT; i++ {
+						if args[1] == charsetNames[i] {
+							normalCharset = i
+							break
+						}
+					}
+			}
+		case "customCharsetA":
+			if len(args[1]) < 1 {
+				return "provided charset is empty"
+			}
+			customCharsetA = []rune(args[1])
+			if len(args) >= 3 && args[2] == "now" {
+				normalCharset = CHARSET_CUSTOM_A
+			}
+		case "customCharsetB":
+			if len(args[1]) < 1 {
+				return "provided charset is empty"
+			}
+			customCharsetB = []rune(args[1])
+			if len(args) >= 3 && args[2] == "now" {
+				normalCharset = CHARSET_CUSTOM_B
+			}
 
 		case "mutantHead":
 			color, err := parseColor(args[1])
@@ -147,6 +197,8 @@ func handleCommand_set(fs *pflag.FlagSet) string {
 		case "mutantTail":
 			color, err := parseColor(args[1])
 			if err == nil { mutantTail = color }
+		default:
+			return "invalid property: " + args[0]
 	}
 	return ""
 }
@@ -203,12 +255,12 @@ func loadDefaults() {
 	// normalHead = Color{136, 204,   0}
 	// normalNeck = Color{ 51, 153,  51}
 	// normalTail = Color{  0,  25,   0}
-	normalMinSpeed = 1
-	normalMaxSpeed = 3
+	normalMinSpeed = 5
+	normalMaxSpeed = 5
 	normalSpeedStep = 1
 	normalMinLen = 8
 	normalMaxLen = 16
-	normalCharset = 2
+	normalCharset = CHARSET_BRAILE
 
 	backCharset = -2
 

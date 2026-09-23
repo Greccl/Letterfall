@@ -68,10 +68,8 @@ var spawnRatio float64
 func generator_0(dt float64) {
 	spawnLeft += spawnRatio * dt
 
-	// guard. 1 mutant per generator iteration
-	var mutantSpawned bool
+	var mutantSpawned bool // 1 mutant per generator iteration
 
-	// generation loop
 	for ; spawnLeft >= 1.0; spawnLeft -= 1.0 {
 		// inital column number to be spawned
 		x := rand.IntN((scrw+oddOffset)/2) * 2

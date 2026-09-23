@@ -154,9 +154,6 @@ func (self *Column) draw(i int) {
 		head = Color{90, 90, 100}
 		neck = Color{90, 90, 90}
 		tail = Color{10, 10, 20}
-	} else
-	if d.lucent {
-		
 	}
 	
 	l := d.pos - d.end + 1
