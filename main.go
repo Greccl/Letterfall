@@ -246,6 +246,8 @@ func main() {
 				}
 		}
 	}
+
+	minishell_finish()
 }
 
 

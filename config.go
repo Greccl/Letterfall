@@ -220,7 +220,6 @@ func saveProfile(name string) {
 	configDir, err := getConfigDir()
 	if err != nil { return }
 
-
 	tempPath := filepath.Join(configDir, name + ".temp.letterfall")
 	f, err := os.OpenFile(tempPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil { return }

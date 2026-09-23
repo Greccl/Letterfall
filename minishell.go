@@ -4,6 +4,9 @@ import (
 	"github.com/Greccl/tcell/v2"
 	"slices"
 	"bufio"
+	"os"
+	"path/filepath"
+	"fmt"
 )
 
 type MinishellResponseWriter struct {}
@@ -30,6 +33,32 @@ func minishell_init() {
 	mshTickId = addTickCallback(0.6, minishell_tickCallback)
 	mshResizeId = addResizeListener(minishell_resizeCallback)
 	mshCommandHandler.writer = bufio.NewWriter(mshResponseWriter)
+
+	dir, err := getConfigDir()
+	if err != nil { return }
+	path := filepath.Join(dir, "letterfall.history")
+	f, err := os.Open(path)
+	if err != nil { return }
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if len(mshHistory) >= 100 { break }
+		line := scanner.Text()
+		mshHistory = append(mshHistory, line)
+	}
+}
+
+func minishell_finish() {
+	dir, err := getConfigDir()
+	if err != nil { return }
+	path := filepath.Join(dir, "letterfall.history")
+	f, err := os.OpenFile(path,os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil { return }
+	defer f.Close()
+	for i, line := range mshHistory {
+		if i >= 100 { break }
+		fmt.Fprintln(f, line)
+	}
 }
 
 func minishell_tickCallback(dt float64) {
@@ -195,7 +224,11 @@ func onKey_minishell(k tcell.Key) {
 			mshCursorPos = len(mshBuffer)
 		case tcell.KeyEnter:
 			line := string(mshBuffer)
-			mshHistory = append(mshHistory, line)
+			if len(mshHistory) < 100 {
+				mshHistory = append(mshHistory, line)
+			} else {
+				mshHistory = slices.Insert(mshHistory, 0, line)
+			}
 			mshHistoryPos = -1
 			mshSavedBuffer = nil
 			mshResponseBuffer = nil
