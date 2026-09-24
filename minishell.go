@@ -183,6 +183,7 @@ func minishell_toggle() {
 	} else {
 		setKeyboardHandlers_default()
 	}
+	setTickStatus(mshTickId, mshActive)
 	minishell_resize()
 }
 
