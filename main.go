@@ -55,11 +55,16 @@ func setKeyboardHandlers_default() {
 }
 
 func defaultRuneHandler(r rune) {
-	
+	switch r {
+		case 'p':
+			postEvent(EVENT_PLAY)
+		case 's':
+			postEvent(EVENT_STEP)
+	}	
 }
 
 func defaultKeyHandler(k tcell.Key) {
-	
+
 }
 
 func handleKey(ev *tcell.EventKey) {
@@ -229,7 +234,7 @@ func main() {
 								rainStatus = !rainStatus
 							case EVENT_STEP:
 								if !rainStatus {
-									tickCycle(0.25)
+									tickCycle(0.025)
 								}
 						}
 				}
@@ -249,5 +254,3 @@ func main() {
 
 	minishell_finish()
 }
-
-
