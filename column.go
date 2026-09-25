@@ -1,8 +1,6 @@
 package main
 
 import (
-	// "fmt"
-	// "math/rand/v2"
 	"github.com/Greccl/tcell/v2"
 )
 
@@ -11,24 +9,15 @@ import (
 type Column struct {
 	drops []Drop
 	count int
-	visibleCount int
 	x int
 	layer int8
-
-	backs Drop
 }
-
-//var backrunes = []rune{9679, 9670, 9643, 9642, 9702, 9711}
-
-
-
-
 
 func (self *Column) resize() {
 	for i := range self.drops {
 		self.drops[i].runes = SliceResize(self.drops[i].runes, scrh)
 	}
-	self.backs.runes = SliceResize(self.backs.runes, scrh)
+	// self.backs.runes = SliceResize(self.backs.runes, scrh)
 }
 
 func (self *Column) newDrop() *Drop {
@@ -50,54 +39,41 @@ func (self *Column) remove(i int) {
 }
 
 func (self *Column) tick(dt float64) {
-	// self.backTick()
 	if self.count == 0 { return }
-	self.visibleCount = 0
 
 	var d *Drop
 
 	// Advance
 	for i:=self.count-1; i>=0; i-- {
 		d = &self.drops[i]
-		var g *SyncGroup
-		if d.mutant {
-			continue
-		} else {
-			g = &normalSyncGroups[d.group]
-		}
-		if g.advance > 0 {
-			d.pos += g.advance
-			d.dirty = true
-		} else {
-			continue
-		}
-/*
-		d.count += d.speed * dt
-		if d.count < 1.0 { continue }
-		d.dirty = true
-		adv := int(d.count)
-		d.pos += adv
-		d.count -= float64(adv)
-*/
 
-/*		trueAdvance := false
-		if d.mutant || syncSpeed <= 0 {
-			d.count++
-			if d.count >= d.speed { trueAdvance = true }
-		} else
-
-		if syncAdvance {
-			trueAdvance = true
+		switch d.class {
+			case CLASS_NORMAL:
+				g := &normalSyncGroups[d.group]
+				if g.advance > 0 {
+					d.pos += g.advance
+					d.dirty = true
+				}
+			case CLASS_MUTANT:
+				d.count += d.speed * dt
+				if d.count < 1.0 { continue }
+				d.dirty = true
+				adv := int(d.count)
+				d.pos += adv
+				d.count -= float64(adv)
+			case CLASS_BACK:
+				d.count += d.speed * dt * float64(BACK_SEGMENTS)
+				if d.count < 1.0 { continue }
+				d.dirty = true
+				if d.group < BACK_SEGMENTS-1 {
+					d.group++
+				} else {
+					d.group = 0
+					d.pos++
+				}
+				d.count = 0.0
 		}
 
-		if trueAdvance {
-			d.pos++
-			if d.pos >= 0 { d.dirty = true }
-			d.count = 0			
-		} else {
-			continue
-		}
-*/		
 		// Check overlaps
 		if i > 0 {
 			if d.pos >= self.drops[i-1].pos {
@@ -131,13 +107,16 @@ func (self *Column) tick(dt float64) {
 	for i:=0; i<self.count; i++ {
 		force = force || self.drops[i].dirty
 		if force && d.pos >= 0 {
-			self.visibleCount++
-			self.draw(i)
+			if d.class == CLASS_BACK {
+				self.drawBackDrop(i)
+			} else {
+				self.drawNormalDrop(i)
+			}
 		}
 	}
 }
 
-func (self *Column) draw(i int) {
+func (self *Column) drawNormalDrop(i int) {
 	d := &self.drops[i]
 	s := tcell.StyleDefault
 	var y int
@@ -145,15 +124,10 @@ func (self *Column) draw(i int) {
 	head := normalHead
 	neck := normalNeck
 	tail := normalTail
-	if d.mutant {
+	if d.class == CLASS_MUTANT {
 		head = mutantHead
 		neck = mutantNeck
 		tail = mutantTail		
-	} else
-	if d.back {
-		head = Color{90, 90, 100}
-		neck = Color{90, 90, 90}
-		tail = Color{10, 10, 20}
 	}
 	
 	l := d.pos - d.end + 1
@@ -175,5 +149,31 @@ func (self *Column) draw(i int) {
 		screen_drawCell(self.layer, self.x, y, d.runes[y], s)
 	}
 	
+	d.dirty = false
+}
+
+func (self *Column) drawBackDrop(i int) {
+	d := &self.drops[i]
+	s := tcell.StyleDefault
+	var y int
+
+	// head := Color{48, 50, 45}
+	// head := Color{80, 83, 75}
+	head := Color{64, 99, 60}
+	tail := Color{32, 33, 30}
+	
+	l := d.pos - d.end + 1
+	for p := 0; p < l; p++ {
+		y = d.pos-p
+		if y < 0 { return }
+		if y >= scrh { continue }
+		alpha := backAlphas[p*BACK_SEGMENTS+d.group]
+		var c Color
+		c = blend(head, tail, 1000-alpha)
+		s.SetForegroundRGB(c.r, c.g, c.b)
+		screen_drawCell(self.layer, self.x, y, d.runes[y], s)
+	}
+	screen_releaseCell(self.layer, self.x, y - 1)
+
 	d.dirty = false
 }

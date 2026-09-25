@@ -25,14 +25,18 @@ var charsetNames = [CHARSET_COUNT]string {
 	"hiragana", "katakana", "greek", "hexagram", "braile", "cyrillic",
 }
 
-var backdropRune rune = '•'
+const (
+	CLASS_NORMAL int8 = iota
+	CLASS_MUTANT
+	CLASS_BACK
+)
+
 var customCharsetA []rune
 var customCharsetB []rune
 
 type Drop struct {
 	runes []rune
-	mutant bool
-	back bool
+	class int8
 
 	pos int
 	length int
@@ -47,25 +51,26 @@ type Drop struct {
 }
 
 func (self *Drop) makeNormal() {
-	self.mutant = false
+	self.class = CLASS_NORMAL
 	self.group = rand.IntN(normalGroupCount)
 	self.length = rand.IntN(normalMaxLen-normalMinLen) + normalMinLen
 	self.resetRunes(normalCharset)
 }
 
 func (self *Drop) makeMutant() {
-	self.mutant = true
+	self.class = CLASS_MUTANT
 	self.speed = mutantMinSpeed + rand.Float64() * (mutantMaxSpeed - mutantMinSpeed)
 	self.length = rand.IntN(mutantMaxLen-mutantMinLen) + mutantMinLen
 	self.resetRunes(mutantCharset)
 }
 
 func (self *Drop) makeBackdrop() {
-	self.back = true
-	self.mutant = false
-	self.speed = 1
-	self.length = 5
-	self.resetRunes(-1)
+	self.class = CLASS_BACK
+	self.length = backLength
+	self.speed = backSpeed
+	self.count = 0.0
+	self.group = 0
+	self.resetRunes(CHARSET_BACKDROP)
 }
 
 func (self *Drop) reset() {

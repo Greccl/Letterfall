@@ -7,69 +7,15 @@ import (
 	"fmt"
 	"strings"
 	"strconv"
-	// "math"
 	"path/filepath"
 	"github.com/spf13/pflag"
 )
 
+
+
 var profile string = "default"
-
-var backHead, backNeck, backTail Color
-var backCharset int
-// var backChar rune
-
-type SyncGroup struct {
-	speed float64
-	count float64
-	advance int
-}
-
-var normalHead, normalNeck, normalTail Color
-var normalMinLen, normalMaxLen int
-var normalMinSpeed, normalMaxSpeed float64
-var normalSpeedStep float64
-var normalGroupCount int
-var normalCharset int
-var normalSyncGroups []SyncGroup //= make([]SyncGroup, 1)
-
-var mutantHead, mutantNeck, mutantTail Color
-var mutantMinLen, mutantMaxLen int
-var mutantMinSpeed, mutantMaxSpeed float64
-// var mutantSpeedStep int
-var mutantCharset int
-var mutantChance float32
-
-var frameDuration int
-var overlap int
-var maxDropsPerColumn int
-var syncSpeed int
-
-func normalizeNormalSpeed() {
-	if normalMaxSpeed < normalMinSpeed {
-		normalMaxSpeed = normalMinSpeed
-	}
-	f := (normalMaxSpeed - normalMinSpeed) / normalSpeedStep
-	// f = math.Ceil(f)
-	n := int(f)
-	if n < 0 { n = 0 }
-	n++
-	normalGroupCount = n
-	if len(normalSyncGroups) != n {
-		normalSyncGroups = make([]SyncGroup, n)
-	}
-	for i := range normalSyncGroups {
-		normalSyncGroups[i].speed = normalMinSpeed + (float64(i) * normalSpeedStep)
-	}
-	for i := range cols {
-		col := &cols[i]
-		for j := range col.drops {
-			drop := &col.drops[j]
-			l := drop.length
-			drop.makeNormal()
-			drop.length = l
-		}
-	}
-}
+// var frameDuration int
+// var overlap int
 
 func handleCommand_get(fs *pflag.FlagSet) string {
 	args := fs.Args()
@@ -259,26 +205,21 @@ func loadDefaults() {
 	normalSpeedStep = 1
 	normalMinLen = 8
 	normalMaxLen = 16
-	normalCharset = CHARSET_BRAILE
+	normalCharset = CHARSET_DEFAULT
 
-	backCharset = -2
+	backCharset = CHARSET_BACKDROP
 
 	mutantHead = Color{204, 153, 255}
 	mutantNeck = Color{250, 255, 250}
 	mutantTail = Color{  0, 204, 122}
-	mutantMinSpeed = 65.0
-	mutantMaxSpeed = 100.0
+	mutantMinSpeed = 12.0
+	mutantMaxSpeed = 24.0
 	// mutantSpeedStep = 1
 	mutantMinLen = 12
 	mutantMaxLen = 24
-	mutantCharset = 0
-	mutantChance = 0.0
+	mutantCharset = CHARSET_UPPERCASE
+	mutantChance = 0.1
 
-	frameDuration = 20
-	overlap = 5
-	maxDropsPerColumn = 1
-	reservedHeight = 0
-	syncSpeed = -1
 	rainStatus = true
 }
 

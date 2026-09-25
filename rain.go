@@ -1,28 +1,79 @@
 package main
 
 import (
-	// "math"
 	"math/rand/v2"
+	// "fmt"
 )
 
 
 
+type SyncGroup struct {
+	speed float64
+	count float64
+	advance int
+}
 
-
-var cols []Column
-var backs []Column
-var syncCount int
-var syncAdvance bool
 var rainStatus bool
 
+var cols []Column
+var density float64 = 0.75 // amount of new drops per chunk of 10 columns
+var spawnLeft float64
+var spawnRatio float64
+var normalSyncGroups []SyncGroup
+var normalHead, normalNeck, normalTail Color
+var normalMinLen, normalMaxLen int
+var normalMinSpeed, normalMaxSpeed float64
+var normalSpeedStep float64
+var normalGroupCount int
+var normalCharset int
+var maxNormalsPerColumn int = 1
+
+var mutantChance float32
+var mutantCharset int
+var mutantHead, mutantNeck, mutantTail Color
+var mutantMinLen, mutantMaxLen int
+var mutantMinSpeed, mutantMaxSpeed float64
+
+var backs []Column
+var backHead, backNeck, backTail Color
+var backCharset int
+var backSpeed float64 = 2.5
+var backCount float64
+var maxBacksPerColumn int = 3
+var backDensity float64 = 0.75 // amount of new drops per chunk of 10 columns
+var backSpawnLeft float64
+var backSpawnRatio float64
+var backLength int
+var backAlphas []int32
+var backdropRune rune = '•'
+// var backdropRune rune = '\u2588'
+const BACK_SEGMENTS int = 3
+
+func setBackLength(l int) {
+	if l % 2 == 0 { l++ }
+	backLength = l
+	c := l * BACK_SEGMENTS
+	half := c / 2
+	backAlphas = make([]int32, c)
+	for i:=0 ; i < half; i++ {
+		a := int32(1000.0 / float64(half) * float64(i))
+		if a < 0 { a = 0 }
+		if a > 1000 { a = 1000 }
+		backAlphas[i] = a
+		backAlphas[c - 1 - i] = a
+	}
+	backAlphas[half] = 1000
+}
 
 func rain_init() {
 	addTickCallback(0.0, rain_tick)
 	normalizeNormalSpeed()
+	setBackLength(7)
 }
 
 func rain_resize() {
 	spawnRatio = float64(scrw) / 10.0  * density
+	backSpawnRatio = float64(scrw) / 10.0  * backDensity
 	if scrw == 0 { return }
 	cols = SliceResize(cols, scrw)
 	backs = SliceResize(backs, scrw)
@@ -40,6 +91,7 @@ func rain_resize() {
 }
 
 func rain_tick(dt float64) {
+	// Normal drops
 	generator_0(dt)
 	for i := range normalSyncGroups {
 		g := &normalSyncGroups[i]
@@ -54,16 +106,42 @@ func rain_tick(dt float64) {
 	for i := 0; i < len(cols); i++ {
 		cols[i].tick(dt)
 	}
+
+	// Back drops
+	back_generator_1(dt)
+	for i := 0; i < len(backs); i++ {
+		backs[i].tick(dt)
+	}
+
+	// Update screen
 	screen_damage()
 }
 
-
-
-
-
-var density float64 = 1.0 // amount of new drops per chunk of 10 columns
-var spawnLeft float64
-var spawnRatio float64
+func normalizeNormalSpeed() {
+	if normalMaxSpeed < normalMinSpeed {
+		normalMaxSpeed = normalMinSpeed
+	}
+	f := (normalMaxSpeed - normalMinSpeed) / normalSpeedStep
+	n := int(f)
+	if n < 0 { n = 0 }
+	n++
+	normalGroupCount = n
+	if len(normalSyncGroups) != n {
+		normalSyncGroups = make([]SyncGroup, n)
+	}
+	for i := range normalSyncGroups {
+		normalSyncGroups[i].speed = normalMinSpeed + (float64(i) * normalSpeedStep)
+	}
+	for i := range cols {
+		col := &cols[i]
+		for j := range col.drops {
+			drop := &col.drops[j]
+			l := drop.length
+			drop.makeNormal()
+			drop.length = l
+		}
+	}
+}
 
 func generator_0(dt float64) {
 	spawnLeft += spawnRatio * dt
@@ -79,7 +157,7 @@ func generator_0(dt float64) {
 		if !allowDups {
 			initialx := x
 			delta := 2
-			MAX: for max:=0; max<maxDropsPerColumn; max++ {
+			MAX: for max:=0; max<maxNormalsPerColumn; max++ {
 				x = initialx
 				for {
 					if cols[x].count == max { break MAX }
@@ -91,7 +169,7 @@ func generator_0(dt float64) {
 		}
 
 		// discard if reached max drop amount in target column
-		if cols[x].count >= maxDropsPerColumn {
+		if cols[x].count >= maxNormalsPerColumn {
 			continue
 		}
 
@@ -99,7 +177,7 @@ func generator_0(dt float64) {
 		var zero *Drop
 		if cols[x].count > 0 {
 			zero = &cols[x].drops[cols[x].count-1]
-			if zero.pos < overlap { continue }
+			// if zero.pos < overlap { continue }
 		}
 		
 		// select drop type
@@ -120,54 +198,42 @@ func generator_0(dt float64) {
 				d.pos = zero.pos - zero.length
 			}
 			if d.pos > 0 { d.pos = 0 }
-			if syncSpeed < 0 {
-				// d.count = syncCount % d.speed
-			}
 		}
 	}
 }
 
+var lastx int
 
+func back_generator_1(dt float64) {
+	backSpawnLeft += backSpawnRatio * dt
+	if backSpawnLeft < 1.0 { return }
 
+	var spawn bool
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-var backSpeed int = 50
-var backCount int
-
-func tick_back(dt float64) {
-	back_generator_0()
-	backCount++
-	if backCount < backSpeed { return }
-	backCount = 0
-	for i := 0; i < len(backs); i++ {
-		backs[i].tick(dt)
+	var zero *Drop
+	if backs[lastx].count == 0 {
+		spawn = true
+	} else {
+		zero = &backs[lastx].drops[backs[lastx].count-1]
+		if zero.pos > backLength + 3 {
+			spawn = true
+		}
 	}
+
+	if !spawn { return }
+	
+	d := backs[lastx].newDrop()
+	d.reset()
+	d.makeBackdrop()
+	lastx++
+	if lastx >= scrw { lastx = 0 }
+	backSpawnLeft -= 1.0
 }
 
-var backSpawnDelay int = 1200
-var backSpawnAmount int = 1
-var backSpawnCounter int
-var maxBacksPerColumn int = 2
-
-func back_generator_0() {
-	backSpawnCounter += frameDuration
-	if backSpawnCounter < backSpawnDelay { return }
-	backSpawnCounter = 0
-
-	for i:=0; i<backSpawnAmount; i++ {
+func back_generator_0(dt float64) {
+	backSpawnLeft += backSpawnRatio * dt
+	
+	for ; backSpawnLeft >= 1.0; backSpawnLeft -= 1.0 {
 		x := rand.IntN(scrw)
 		initialx := x
 		MAX: for max:=0; max<maxBacksPerColumn; max++ {
@@ -187,7 +253,7 @@ func back_generator_0() {
 		var zero *Drop
 		if backs[x].count > 0 {
 			zero = &backs[x].drops[backs[x].count-1]
-			if zero.pos < overlap { return }
+			// if zero.pos < overlap { return }
 		}
 		
 		d := backs[x].newDrop()
