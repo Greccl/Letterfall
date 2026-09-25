@@ -9,10 +9,13 @@ const (
 	CHARSET_CUSTOM_B
 	CHARSET_DEFAULT
 	CHARSET_ONEZERO
+	CHARSET_NUMBERS
 	CHARSET_UPPERCASE
 	CHARSET_ASCII
+	CHARSET_ALNUM
 	CHARSET_HIRAGANA
 	CHARSET_KATAKANA
+	CHARSET_HALFKANA
 	CHARSET_GREEK
 	CHARSET_HEXAGRAM
 	CHARSET_BRAILE
@@ -21,8 +24,8 @@ const (
 	CHARSET_BACKDROP
 )
 var charsetNames = [CHARSET_COUNT]string {
-	"customA", "customB", "default", "onezero", "uppercase", "ascii",
-	"hiragana", "katakana", "greek", "hexagram", "braile", "cyrillic",
+	"customA", "customB", "default", "onezero", "numbers", "uppercase", "ascii", "alnum",
+	"hiragana", "katakana", "halfkana", "greek", "hexagram", "braile", "cyrillic",
 }
 
 const (
@@ -113,18 +116,37 @@ func (self *Drop) resetRunes(n int) {
 				self.runes[i] = '\u250B'
 			case CHARSET_ONEZERO:
 				self.runes[i] = 0x0030 + rand.Int32N(2)
+			case CHARSET_NUMBERS:
+				self.runes[i] = 0x0030 + rand.Int32N(10)
 			case CHARSET_UPPERCASE:
 				self.runes[i] = 0x0041 + rand.Int32N(26)
 			case CHARSET_ASCII:
 				self.runes[i] = 0x0021 + rand.Int32N(94)
-			case CHARSET_HIRAGANA:
+			case CHARSET_ALNUM:
+				r := rand.Int32N(62)
+				if r >= 36 {
+					r += 0x0061 - 36
+				} else if r >= 10 {
+					r += 0x0041 - 10
+				} else {
+					r += 0x0030
+				}
+				self.runes[i] = r
+		case CHARSET_HIRAGANA:
 				self.runes[i] = 0x3040 + rand.Int32N(96)
 			case CHARSET_KATAKANA:
 				self.runes[i] = 0x30A0 + rand.Int32N(96)
+			case CHARSET_HALFKANA:
+				self.runes[i] = 0xFF66 + rand.Int32N(56)
 			case CHARSET_GREEK:
-				r := 0x0391 + rand.Int32N(48)
-				if r > 0x03A1 { r += 1 }
-				if r > 0x03A8 { r += 7 }
+				r := rand.Int32N(49)
+				if r >= 24 {
+					r += 0x03B1 - 24
+				} else if r >= 17 {
+					r += 0x03A3 - 17
+				} else {
+					r += 0x0391
+				}
 				self.runes[i] = r
 			case CHARSET_HEXAGRAM:
 				self.runes[i] = 0x4DC0 + rand.Int32N(62)

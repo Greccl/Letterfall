@@ -110,11 +110,15 @@ func handleCommand_set(fs *pflag.FlagSet) string {
 					}
 					return "no custom charset defined"
 				default:
-					for i:=CHARSET_DEFAULT; i<CHARSET_COUNT; i++ {
+					i := CHARSET_DEFAULT
+					for ; i<CHARSET_COUNT; i++ {
 						if args[1] == charsetNames[i] {
 							normalCharset = i
 							break
 						}
+					}
+					if i != normalCharset {
+						return "invalid charset name: " + args[1]
 					}
 			}
 		case "customCharsetA":
@@ -212,7 +216,7 @@ func loadDefaults() {
 	mutantHead = Color{204, 153, 255}
 	mutantNeck = Color{250, 255, 250}
 	mutantTail = Color{  0, 204, 122}
-	mutantMinSpeed = 12.0
+	mutantMinSpeed = 18.0
 	mutantMaxSpeed = 24.0
 	// mutantSpeedStep = 1
 	mutantMinLen = 12
